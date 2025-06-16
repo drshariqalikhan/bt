@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en" class="has-navbar-fixed-top">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Backtester</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+    <style>
+        :root { --body-bg-color: #f0f2f5; --box-bg-color: #ffffff; --text-color: #4a4a4a; --label-color: #363636; --grid-color: #dbdbdb; --chart-bg-color: #f5f5f5; --bulma-info-color: #3273dc; --bulma-success-color: #23d160; --bulma-danger-color: #ff3860; --input-border-color: #dbdbdb; --navbar-divider-color: #dbdbdb; }
+        html.dark-mode { --body-bg-color: #1a1a1a; --box-bg-color: #2c2c2c; --text-color: #e0e0e0; --label-color: #e0e0e0; --grid-color: #4a4a4a; --chart-bg-color: #222222; --bulma-info-color: #5d9cec; --bulma-success-color: #6cff9c; --bulma-danger-color: #ff6b89; --input-border-color: #4a4a4a; --navbar-divider-color: #4a4a4a; }
+        body { background-color: var(--body-bg-color); color: var(--text-color); }
+        .box, .navbar.is-light, .button.is-info, .button.is-info:hover, .modal-card { background-color: var(--box-bg-color); }
+        .input, .modal-card-title, .modal-card-body { background-color: var(--box-bg-color); color: var(--text-color); border-color: var(--input-border-color); }
+        .title, .label, .navbar-item, .navbar-link, .button { color: var(--text-color); }
+        .navbar.is-light .navbar-link::after { border-color: var(--text-color); }
+        .navbar-dropdown { min-width: 20rem; background-color: var(--box-bg-color); border-top: 1px solid var(--grid-color); }
+        .navbar-dropdown .navbar-item, .radio { color: var(--text-color); }
+        .navbar-divider { background-color: var(--navbar-divider-color); }
+        #chart-and-table-container { height: 85vh; }
+        #left-column { display: flex; flex-direction: column; height: 100%; }
+        #chartContainer { flex: 1; min-height: 0; background-color: var(--chart-bg-color); border-radius: 6px; }
+        #portfolio-chart-container { flex-shrink: 0; height: 250px; background-color: var(--chart-bg-color); border-radius: 6px; margin-top: 1rem; }
+        #right-column { display: flex; flex-direction: column; height: 100%; }
+        #backtest-results-container { flex-shrink: 0; }
+        #table-container { flex-grow: 1; min-height: 0; overflow-y: auto; border-radius: 6px; background-color: var(--chart-bg-color); }
+        .table { background-color: var(--box-bg-color); color: var(--text-color); }
+        .table thead th { position: sticky; top: 0; z-index: 1; background-color: var(--box-bg-color); color: var(--text-color); border-color: var(--grid-color) !important; }
+        .table td, .table th { border-color: var(--grid-color) !important; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar is-fixed-top is-light" role="navigation" aria-label="main navigation">
+        <div class="navbar-brand"><a class="navbar-item has-text-weight-bold">Portfolio Backtester</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicMenu"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a></div>
+        <div id="navbarBasicMenu" class="navbar-menu">
+            <div class="navbar-start">
+                <div class="navbar-item"><div class="field is-grouped"><p class="control"><button id="runBacktestButton" class="button is-success">Fetch & Run Backtest</button></p></div></div>
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link">Settings</a>
+                    <div class="navbar-dropdown">
+                        <div class="navbar-item"><div><label class="label is-small">Fast EMA: <span id="fastEmaValue">10</span> weeks</label><input id="fastEmaSlider" class="slider is-fullwidth is-info" type="range" min="2" max="50" value="10"></div></div>
+                        <div class="navbar-item"><div><label class="label is-small">Slow EMA: <span id="slowEmaValue">20</span> weeks</label><input id="slowEmaSlider" class="slider is-fullwidth is-success" type="range" min="5" max="100" value="20"></div></div><hr class="navbar-divider">
+                        <div class="navbar-item"><div class="field"><label class="label is-small">Initial Portfolio Value</label><div class="control"><input id="initialPortfolioInput" class="input is-small" type="text" value="1,700,000"></div></div></div>
+                        <div class="navbar-item"><div><label class="label is-small">Look-back Period: <span id="lookbackValue">10</span> years</label><input id="lookbackSlider" class="slider is-fullwidth is-warning" type="range" min="1" max="20" value="10"></div></div><hr class="navbar-divider">
+                        <div class="navbar-item"><div class="control"><label class="label is-small">EMA Crossover Strategy</label><label class="radio"><input type="radio" name="ema_strategy" value="on" checked> On</label><label class="radio"><input type="radio" name="ema_strategy" value="off"> Off</label></div></div>
+                        <div class="navbar-item"><div class="control"><label class="label is-small">Buy The Dip (BTD) Strategy</label><label class="radio"><input type="radio" name="btd_strategy" value="on" checked> On</label><label class="radio"><input type="radio" name="btd_strategy" value="off"> Off</label></div></div><hr class="navbar-divider">
+                        <a href="#" class="navbar-item" id="insights-link">Insights</a><hr class="navbar-divider">
+                        <div class="navbar-item"><button id="theme-toggle" class="button is-fullwidth">Toggle Theme</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="section">
+        <div class="container is-fluid">
+            <div class="box"><label class="label">Portfolio Composition (First ticker drives signals)</label><div id="portfolio-rows-container"></div><div class="is-flex is-justify-content-space-between is-align-items-center mt-3"><button id="add-stock-btn" class="button is-small is-link">Add Stock</button><div id="total-allocation-display" class="has-text-weight-bold">Total: 100%</div></div></div>
+            <div id="chart-and-table-container" class="columns">
+                <div id="left-column" class="column is-two-thirds"><div id="chartContainer"><canvas id="priceChart"></canvas></div><div id="portfolio-chart-container"><canvas id="portfolioChart"></canvas></div></div>
+                <div id="right-column" class="column is-one-third"><div id="backtest-results-container" class="box has-text-centered mb-4"><p>Backtest results will appear here.</p></div><div id="table-container"><table class="table is-striped is-fullwidth is-hoverable is-narrow"><thead><tr><th>Date</th><th>Portfolio Value</th><th>Event</th></tr></thead><tbody id="data-table-body"></tbody></table></div></div>
+            </div>
+            <div id="statusMessage" class="has-text-centered mt-2"></div>
+        </div>
+    </section>
+
+    <div class="modal" id="insights-modal"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Backtest Insights</p><button class="delete" aria-label="close"></button></header><section class="modal-card-body"><div class="content"><ul><li>Downtrends with no dip buys: <strong id="missed-dips-value">N/A</strong></li><li>Median downtrend duration: <strong id="median-duration-value">N/A</strong> weeks</li><li>Median frequency of sell signals: <strong id="median-frequency-value">N/A</strong> weeks</li></ul></div></section></div></div>
+
+    <script>
+        const fastEmaSlider=document.getElementById('fastEmaSlider'),fastEmaValue=document.getElementById('fastEmaValue'),slowEmaSlider=document.getElementById('slowEmaSlider'),slowEmaValue=document.getElementById('slowEmaValue'),chartContainer=document.getElementById('chartContainer'),priceCanvas=document.getElementById('priceChart'),priceCtx=priceCanvas.getContext('2d'),statusMessage=document.getElementById('statusMessage'),themeToggleButton=document.getElementById('theme-toggle'),dataTableBody=document.getElementById('data-table-body'),backtestButton=document.getElementById('runBacktestButton'),backtestResultsContainer=document.getElementById('backtest-results-container'),initialPortfolioInput=document.getElementById('initialPortfolioInput'),lookbackSlider=document.getElementById('lookbackSlider'),lookbackValue=document.getElementById('lookbackValue'),portfolioChartContainer=document.getElementById('portfolio-chart-container'),portfolioCanvas=document.getElementById('portfolioChart'),portfolioCtx=portfolioCanvas.getContext('2d'),insightsModal=document.getElementById('insights-modal'),insightsLink=document.getElementById('insights-link'),missedDipsValue=document.getElementById('missed-dips-value'),medianDurationValue=document.getElementById('median-duration-value'),medianFrequencyValue=document.getElementById('median-frequency-value'),portfolioRowsContainer=document.getElementById('portfolio-rows-container'),addStockBtn=document.getElementById('add-stock-btn'),totalAllocationDisplay=document.getElementById('total-allocation-display');
+        let portfolioData={};let insightsData=null;const CORS_PROXY="https://corsproxy.io/?";
+        
+        [fastEmaSlider,slowEmaSlider,lookbackSlider].forEach(el=>el.addEventListener('change',runBacktest));
+        document.querySelectorAll('input[name="ema_strategy"],input[name="btd_strategy"]').forEach(r=>r.addEventListener('change',runBacktest));
+        fastEmaSlider.addEventListener('input',()=>fastEmaValue.textContent=`${fastEmaSlider.value} weeks`);
+        slowEmaSlider.addEventListener('input',()=>slowEmaValue.textContent=`${slowEmaSlider.value} weeks`);
+        lookbackSlider.addEventListener('input',()=>lookbackValue.textContent=`${lookbackSlider.value} years`);
+        themeToggleButton.addEventListener('click',()=>{const isDarkMode=document.documentElement.classList.toggle('dark-mode');localStorage.setItem('theme',isDarkMode?'dark':'light');if(Object.keys(portfolioData).length>0)runBacktest();});
+        document.addEventListener('DOMContentLoaded',()=>{const burger=document.querySelector('.navbar-burger'),menu=document.querySelector('.navbar-menu');burger.addEventListener('click',()=>{burger.classList.toggle('is-active');menu.classList.toggle('is-active');});if(localStorage.getItem('theme')!=='light'){document.documentElement.classList.add('dark-mode');}addStockRow('IWQU.UK',60);addStockRow('GOOG.US',40);validateAllocations();runBacktest();});
+        backtestButton.addEventListener('click',runBacktest);
+        insightsLink.addEventListener('click',e=>{e.preventDefault();if(insightsData){missedDipsValue.textContent=insightsData.missedDips;medianDurationValue.textContent=insightsData.medianDuration;medianFrequencyValue.textContent=insightsData.medianFrequency;insightsModal.classList.add('is-active');}});
+        insightsModal.querySelector('.modal-background').addEventListener('click',()=>insightsModal.classList.remove('is-active'));
+        insightsModal.querySelector('.delete').addEventListener('click',()=>insightsModal.classList.remove('is-active'));
+        addStockBtn.addEventListener('click',()=>addStockRow('',0));
+
+        function addStockRow(ticker='',allocation=0){const row=document.createElement('div');row.className='field is-grouped mb-2';row.innerHTML=`<p class="control is-expanded"><input class="input is-small ticker-input" type="text" placeholder="Ticker" value="${ticker}"></p><p class="control"><input class="input is-small allocation-input" type="number" placeholder="%" value="${allocation}" style="width:70px;"></p><p class="control"><button class="button is-small is-danger remove-stock-btn">X</button></p>`;portfolioRowsContainer.appendChild(row);row.querySelector('.remove-stock-btn').addEventListener('click',()=>{row.remove();validateAllocations();});row.querySelectorAll('input').forEach(input=>input.addEventListener('change',validateAllocations));}
+        function validateAllocations(){const inputs=Array.from(document.querySelectorAll('.allocation-input'));const total=inputs.reduce((sum,input)=>sum+(parseFloat(input.value)||0),0);totalAllocationDisplay.textContent=`Total: ${total}%`;totalAllocationDisplay.classList.toggle('has-text-danger',total!==100);totalAllocationDisplay.classList.toggle('has-text-success',total===100);}
+        
+        const calculateEMA=(d,p)=>{if(!d||d.length<p)return new Array(d.length).fill(null);const k=2/(p+1),e=new Array(d.length).fill(null);let s=0;for(let i=0;i<p;i++)s+=d[i];e[p-1]=s/p;for(let i=p;i<d.length;i++)e[i]=(d[i]*k)+(e[i-1]*(1-k));return e;};
+        const formatCurrency=v=>v.toLocaleString('en-US',{style:'currency',currency:'USD'});const formatPercent=v=>(v*100).toFixed(2)+'%';
+        const calculateCAGR=(s,e,y)=>y<=0?0:Math.pow(e/s,1/y)-1;
+        const calculateMedian=a=>{if(a.length===0)return 0;a.sort((x,y)=>x-y);const m=Math.floor(a.length/2);return a.length%2!==0?a[m]:(a[m-1]+a[m])/2;};
+
+        async function fetchAndAlignData() {
+            const rows = Array.from(document.querySelectorAll('#portfolio-rows-container .field'));
+            if (rows.length === 0) { statusMessage.textContent = "Please add at least one stock."; return false; }
+            statusMessage.textContent = `Fetching data for ${rows.length} tickers...`;
+            const fetchPromises = rows.map(row => { const ticker = row.querySelector('.ticker-input').value.trim().toUpperCase(); if (!ticker) return Promise.reject(new Error("Empty ticker found.")); const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`; const proxyUrl = `${CORS_PROXY}${encodeURIComponent(stooqUrl)}`; return fetch(proxyUrl).then(res => res.ok ? res.text() : Promise.reject(new Error(`Failed for ${ticker}`))); });
+            try {
+                const results = await Promise.all(fetchPromises);
+                const rawData = {};
+                rows.forEach((row, i) => { const ticker = row.querySelector('.ticker-input').value.trim().toUpperCase(); rawData[ticker] = results[i]; });
+                
+                const parsedData = {}, allDates = new Set();
+                for (const ticker in rawData) {
+                    const data = rawData[ticker]; if (data.trim().startsWith('<') || !data.toUpperCase().includes('DATE')) continue;
+                    const lines = data.trim().split('\n'), headerLine = lines.shift(), delimiter = headerLine.includes(';') ? ';' : ',';
+                    const headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
+                    const dateIndex = headers.indexOf('DATE'), closeIndex = headers.indexOf('CLOSE');
+                    if (dateIndex === -1 || closeIndex === -1) continue;
+                    parsedData[ticker] = {};
+                    lines.forEach(line => { const cols = line.split(delimiter); if (cols[dateIndex] && !isNaN(parseFloat(cols[closeIndex]))) { const date = cols[dateIndex].trim(); parsedData[ticker][date] = parseFloat(cols[closeIndex]); allDates.add(date); }});
+                }
+                const masterTimeline = Array.from(allDates).sort();
+                portfolioData = {};
+                for (const ticker in parsedData) {
+                    const prices = []; let lastKnownPrice = null;
+                    masterTimeline.forEach(date => { if (parsedData[ticker][date] !== undefined) { prices.push(parsedData[ticker][date]); lastKnownPrice = parsedData[ticker][date]; } else { prices.push(lastKnownPrice); } });
+                    portfolioData[ticker] = { prices };
+                }
+                portfolioData.dates = masterTimeline;
+                statusMessage.textContent = "All data loaded.";
+                return true;
+            } catch (error) { statusMessage.textContent = `Error: ${error.message}`; return false; }
+        }
+
+        async function runBacktest() {
+            // --- NEW/MODIFIED - Unified workflow starts here ---
+            const success = await fetchAndAlignData();
+            if (!success) return; // Stop if data fetching failed
+
+            const rows = Array.from(document.querySelectorAll('#portfolio-rows-container .field'));
+            const portfolioConfig = rows.map(row => ({ ticker: row.querySelector('.ticker-input').value.trim().toUpperCase(), allocation: (parseFloat(row.querySelector('.allocation-input').value) || 0) / 100 }));
+            if (portfolioConfig.length === 0) return;
+
+            const fastPeriod=parseInt(fastEmaSlider.value,10),slowPeriod=parseInt(slowEmaSlider.value,10);
+            const initialInvestment=parseFloat(initialPortfolioInput.value.replace(/,/g,''))||1e6;
+            const lookbackYears=parseInt(lookbackSlider.value,10);
+            const isEmaOn=document.querySelector('input[name="ema_strategy"]:checked').value==='on';
+            const isBtdOn=document.querySelector('input[name="btd_strategy"]:checked').value==='on';
+            
+            const masterDates = portfolioData.dates;
+            const primaryTicker = portfolioConfig[0].ticker;
+            if (!portfolioData[primaryTicker]) { statusMessage.textContent = `Primary ticker ${primaryTicker} not found.`; return; }
+            
+            const fastEmaData=calculateEMA(portfolioData[primaryTicker].prices,fastPeriod),slowEmaData=calculateEMA(portfolioData[primaryTicker].prices,slowPeriod);
+            const endDate=new Date(masterDates[masterDates.length-1]);const startDate=new Date(endDate);startDate.setFullYear(endDate.getFullYear()-lookbackYears);
+            let startIndex=masterDates.findIndex(d=>new Date(d)>=startDate);
+            if(startIndex===-1||startIndex<Math.max(fastPeriod,slowPeriod))startIndex=Math.max(fastPeriod,slowPeriod);
+            
+            const backtestData=[],portfolioHistory=[],buyAndHoldHistory=[];
+            let lastConfirmedPeak=0,triggeredDipsThisCycle=new Set(),btdEventCountInCycle=0,initialBtdCashPool=0;
+            let cash=0,portfolioShares={};
+            portfolioConfig.forEach(p=>portfolioShares[p.ticker]=0);
+            portfolioConfig.forEach(p=>{const value=initialInvestment*p.allocation;const price=portfolioData[p.ticker].prices[startIndex];if(price>0)portfolioShares[p.ticker]=value/price;});
+            const buyAndHoldShares={};portfolioConfig.forEach(p=>{const value=initialInvestment*p.allocation;const price=portfolioData[p.ticker].prices[startIndex];if(price>0)buyAndHoldShares[p.ticker]=value/price;});
+            
+            let portfolioPeak=initialInvestment,maxDrawdown=0,buyHoldPeak=initialInvestment,maxBuyHoldDrawdown=0;
+            let sellEvents=[],downtrends=[],currentDowntrend=null;
+            const btdLevels=[];for(let l=15;l<=50;l+=3)btdLevels.push(l);btdLevels.sort((a,b)=>b-a);
+
+            for(let i=startIndex;i<masterDates.length;i++){
+                let portfolioValue=cash,buyHoldValue=0;
+                portfolioConfig.forEach(p=>{const price=portfolioData[p.ticker].prices[i];if(price)portfolioValue+=(portfolioShares[p.ticker]||0)*price;});
+                portfolioConfig.forEach(p=>{const price=portfolioData[p.ticker].prices[i];if(price)buyHoldValue+=(buyAndHoldShares[p.ticker]||0)*price;});
+                portfolioHistory.push(portfolioValue);buyAndHoldHistory.push(buyHoldValue);
+                portfolioPeak=Math.max(portfolioPeak,portfolioValue);maxDrawdown=Math.max(maxDrawdown,(portfolioPeak-portfolioValue)/portfolioPeak);
+                buyHoldPeak=Math.max(buyHoldPeak,buyHoldValue);maxBuyHoldDrawdown=Math.max(maxBuyHoldDrawdown,(buyHoldPeak-buyHoldValue)/buyHoldPeak);
+
+                let event='';
+                const pFast=fastEmaData[i-1],cFast=fastEmaData[i],pSlow=slowEmaData[i-1],cSlow=slowEmaData[i];
+                if(pFast&&cFast&&pSlow&&cSlow){
+                    if(isEmaOn&&pFast<=pSlow&&cFast>cSlow&&cash>0){event='Buy All';portfolioConfig.forEach(p=>{const amount=cash*p.allocation;const price=portfolioData[p.ticker].prices[i];if(price>0)portfolioShares[p.ticker]+=amount/price;});cash=0;initialBtdCashPool=0;if(currentDowntrend){currentDowntrend.endIndex=i;downtrends.push(currentDowntrend);currentDowntrend=null;}}
+                    else if(isEmaOn&&pFast>=pSlow&&cFast<cSlow&&Object.values(portfolioShares).some(s=>s>0)){event='Sell All';portfolioConfig.forEach(p=>{const price=portfolioData[p.ticker].prices[i];if(price>0)cash+=portfolioShares[p.ticker]*price;portfolioShares[p.ticker]=0;});initialBtdCashPool=cash;sellEvents.push(i);currentDowntrend={startIndex:i,btdCount:0};}
+                    
+                    if(pFast>pSlow&&cFast<=cSlow){const h=portfolioData[primaryTicker].prices.slice(0,i+1);const p=Math.max(...h);const pIdx=h.lastIndexOf(p);const backtestIdx=pIdx-startIndex;if(backtestData[backtestIdx])backtestData[backtestIdx].event+=' (ATH)';lastConfirmedPeak=p;triggeredDipsThisCycle.clear();btdEventCountInCycle=0;}
+                    if(pFast<=pSlow&&cFast>cSlow){lastConfirmedPeak=0;}
+                }
+                if(event===''&&lastConfirmedPeak>0&&isBtdOn&&cash>0){
+                    const price=portfolioData[primaryTicker].prices[i];
+                    for(const level of btdLevels){
+                        if(price<=lastConfirmedPeak*(1-level/100)&&!triggeredDipsThisCycle.has(level)){
+                            const newlyTriggeredLevels=btdLevels.filter(l=>l<=level&&!triggeredDipsThisCycle.has(l));
+                            const investmentRatio=btdEventCountInCycle===0?0.25:0.03;
+                            const amountToInvest=initialBtdCashPool*investmentRatio*newlyTriggeredLevels.length;
+                            const cashToUse=Math.min(cash,amountToInvest);
+                            if(cashToUse>0){portfolioConfig.forEach(p=>{const stockAmount=cashToUse*p.allocation;const stockPrice=portfolioData[p.ticker].prices[i];if(stockPrice>0)portfolioShares[p.ticker]+=stockAmount/stockPrice;});cash-=cashToUse;btdEventCountInCycle+=newlyTriggeredLevels.length;event=`${level}% BTD (${btdEventCountInCycle})`;newlyTriggeredLevels.forEach(l=>triggeredDipsThisCycle.add(l));if(currentDowntrend)currentDowntrend.btdCount=btdEventCountInCycle;}
+                            break;
+                        }
+                    }
+                }
+                backtestData.push({date:masterDates[i],price:portfolioValue,event});
+            }
+            populateTable(backtestData);
+            const finalPortfolioValue=portfolioHistory[portfolioHistory.length-1],finalBuyAndHoldValue=buyAndHoldHistory[buyAndHoldHistory.length-1];
+            const actualYears=(new Date(masterDates[masterDates.length-1])-new Date(masterDates[startIndex]))/(1000*60*60*24*365.25);
+            const strategyCAGR=calculateCAGR(initialInvestment,finalPortfolioValue,actualYears),buyHoldCAGR=calculateCAGR(initialInvestment,finalBuyAndHoldValue,actualYears);
+            backtestResultsContainer.innerHTML=`<div class="level"><div class="level-item has-text-centered"><div><p class="heading">Strategy</p><p class="title is-5">${formatCurrency(finalPortfolioValue)}</p></div></div><div class="level-item has-text-centered"><div><p class="heading">Buy & Hold</p><p class="title is-5">${formatCurrency(finalBuyAndHoldValue)}</p></div></div></div><div class="level is-size-7"><div class="level-item has-text-centered"><div><p class="heading">CAGR</p><p class="has-text-weight-bold">${formatPercent(strategyCAGR)}</p></div></div><div class="level-item has-text-centered"><div><p class="heading">CAGR</p><p class="has-text-weight-bold">${formatPercent(buyHoldCAGR)}</p></div></div></div><div class="level is-size-7"><div class="level-item has-text-centered"><div><p class="heading">Max Drawdown</p><p class="has-text-weight-bold has-text-danger">${formatPercent(maxDrawdown)}</p></div></div><div class="level-item has-text-centered"><div><p class="heading">Max Drawdown</p><p class="has-text-weight-bold has-text-danger">${formatPercent(maxBuyHoldDrawdown)}</p></div></div></div>`;
+            const missedDips=downtrends.filter(d=>d.btdCount===0).length;const downtrendDurations=downtrends.map(d=>(d.endIndex||masterDates.length-1)-d.startIndex).filter(d=>d>0);const sellFrequencies=[];for(let i=1;i<sellEvents.length;i++)sellFrequencies.push(sellEvents[i]-sellEvents[i-1]);
+            insightsData={missedDips:`${missedDips} of ${downtrends.length} downtrends`,medianDuration:calculateMedian(downtrendDurations).toFixed(1),medianFrequency:calculateMedian(sellFrequencies).toFixed(1)};
+            const chartDates=masterDates.slice(startIndex),chartPrices=portfolioData[primaryTicker].prices.slice(startIndex),chartFastEma=fastEmaData.slice(startIndex),chartSlowEma=slowEmaData.slice(startIndex);
+            const chartCrossovers=backtestData.map((d,i)=>d.event.includes('All')||d.event.includes('BTD')?{index:i,type:d.event.includes('Buy')||d.event.includes('BTD')?'buy':'sell',price:portfolioData[primaryTicker].prices[startIndex+i]}:null).filter(e=>e);
+            const chartAthMarkers=backtestData.map((d,i)=>d.event.includes('ATH')?{index:i,price:portfolioData[primaryTicker].prices[startIndex+i]}:null).filter(e=>e);
+            drawPriceChart(chartDates,chartPrices,chartFastEma,chartSlowEma,chartCrossovers,chartAthMarkers);
+            drawPortfolioChart(chartDates,portfolioHistory,buyAndHoldHistory);
+        }
+
+        function populateTable(data){let tableHtml='';for(let i=data.length-1;i>=0;i--){const row=data[i];tableHtml+=`<tr><td>${row.date}</td><td>${formatCurrency(row.price)}</td><td>${row.event}</td></tr>`;}dataTableBody.innerHTML=tableHtml;}
+        function drawPriceChart(dates,prices,fastEmaData,slowEmaData,crossoverEvents=[],athMarkers=[]){const w=chartContainer.clientWidth,h=chartContainer.clientHeight;if(w<=0||h<=0||!prices)return;const styles=getComputedStyle(document.documentElement);const gridColor=styles.getPropertyValue('--grid-color').trim(),textColor=styles.getPropertyValue('--text-color').trim(),priceColor=textColor,fastEmaColor=styles.getPropertyValue('--bulma-info-color').trim(),slowEmaColor=styles.getPropertyValue('--bulma-success-color').trim(),sellColor=styles.getPropertyValue('--bulma-danger-color').trim();priceCanvas.width=w*devicePixelRatio;priceCanvas.height=h*devicePixelRatio;priceCanvas.style.width=`${w}px`;priceCanvas.style.height=`${h}px`;priceCtx.scale(devicePixelRatio,devicePixelRatio);priceCtx.clearRect(0,0,w,h);const allDataPoints=[...prices,...fastEmaData.filter(v=>v),...slowEmaData.filter(v=>v)].filter(v=>v!==null);const minY=Math.min(...allDataPoints),maxY=Math.max(...allDataPoints),yRange=maxY-minY;const margin={top:20,right:50,bottom:40,left:50};const chartWidth=w-margin.left-margin.right,chartHeight=h-margin.top-margin.bottom;const mapX=index=>margin.left+(index/(prices.length-1))*chartWidth;const mapY=value=>h-margin.bottom-((value-minY)/yRange)*chartHeight;priceCtx.lineWidth=.5;priceCtx.strokeStyle=gridColor;priceCtx.font="12px sans-serif";priceCtx.fillStyle=textColor;const numYGridLines=5;for(let i=0;i<=numYGridLines;i++){const value=minY+(i/numYGridLines)*yRange,y=mapY(value);priceCtx.beginPath();priceCtx.moveTo(margin.left,y);priceCtx.lineTo(margin.left+chartWidth,y);priceCtx.stroke();priceCtx.textAlign='right';priceCtx.fillText(value.toFixed(2),margin.left-8,y+4);}const numXGridLines=Math.floor(chartWidth/100),xTickStep=Math.max(1,Math.floor(prices.length/numXGridLines));for(let i=0;i<prices.length;i+=xTickStep){const x=mapX(i);priceCtx.textAlign='center';priceCtx.fillText(dates[i].substring(0,4),x,h-margin.bottom+20);}const drawLine=(ctx,data,color,lineWidth=1.5)=>{ctx.beginPath();ctx.lineWidth=lineWidth;ctx.strokeStyle=color;let firstPoint=!0;for(let i=0;i<data.length;i++){const value=data[i];if(value!==null){const x=mapX(i),y=mapY(value);if(firstPoint){ctx.moveTo(x,y);firstPoint=!1;}else{ctx.lineTo(x,y);}}}ctx.stroke();};drawLine(priceCtx,prices,priceColor,2);drawLine(priceCtx,fastEmaData,fastEmaColor,1.5);drawLine(priceCtx,slowEmaData,slowEmaColor,1.5);priceCtx.font='16px sans-serif';crossoverEvents.forEach(event=>{const x=mapX(event.index),y=mapY(event.price);if(event.type==='buy'){priceCtx.fillStyle=fastEmaColor;priceCtx.textAlign='center';priceCtx.fillText('▲',x,y+25);}else if(event.type==='sell'){priceCtx.fillStyle=sellColor;priceCtx.textAlign='center';priceCtx.fillText('▼',x,y-15);}});athMarkers.forEach(marker=>{const x=mapX(marker.index),y=mapY(marker.price);priceCtx.fillStyle=textColor;priceCtx.beginPath();priceCtx.arc(x,y,4,0,2*Math.PI);priceCtx.fill();priceCtx.font='12px sans-serif';priceCtx.textAlign='center';priceCtx.fillText(marker.price.toFixed(2),x,y-10);});}
+        function drawPortfolioChart(dates,strategyValues,buyHoldValues){const w=portfolioChartContainer.clientWidth,h=portfolioChartContainer.clientHeight;if(w<=0||h<=0)return;const styles=getComputedStyle(document.documentElement);const gridColor=styles.getPropertyValue('--grid-color').trim(),textColor=styles.getPropertyValue('--text-color').trim(),strategyColor=styles.getPropertyValue('--bulma-info-color').trim(),buyHoldColor=textColor;portfolioCanvas.width=w*devicePixelRatio;portfolioCanvas.height=h*devicePixelRatio;portfolioCanvas.style.width=`${w}px`;portfolioCanvas.style.height=`${h}px`;portfolioCtx.scale(devicePixelRatio,devicePixelRatio);portfolioCtx.clearRect(0,0,w,h);const allVals=[...strategyValues,...buyHoldValues],minVal=Math.min(...allVals),maxVal=Math.max(...allVals),padding=(maxVal-minVal)*.1||10,yMin=Math.max(0,minVal-padding),yMax=maxVal+padding,yRange=yMax-yMin;if(yRange<=0)return;const margin={top:20,right:50,bottom:40,left:60};const chartWidth=w-margin.left-margin.right,chartHeight=h-margin.top-margin.bottom;const mapX=i=>margin.left+i/(dates.length-1)*chartWidth,mapY=v=>h-margin.bottom-(v-yMin)/yRange*chartHeight;portfolioCtx.lineWidth=.5;portfolioCtx.strokeStyle=gridColor;portfolioCtx.font="12px sans-serif";portfolioCtx.fillStyle=textColor;const yTicks=5;for(let i=0;i<=yTicks;i++){const val=yMin+(i/yTicks)*yRange,y=mapY(val);portfolioCtx.beginPath();portfolioCtx.moveTo(margin.left,y);portfolioCtx.lineTo(margin.left+chartWidth,y);portfolioCtx.stroke();portfolioCtx.textAlign='right';portfolioCtx.fillText(val>=1e6?(val/1e6).toFixed(1)+'M':val>=1e3?(val/1e3).toFixed(0)+'k':val.toFixed(0),margin.left-8,y+4);}const drawLine=(ctx,data,color,width=1.5)=>{ctx.beginPath();ctx.lineWidth=width;ctx.strokeStyle=color;let lastX;for(let i=0;i<data.length;i++){if(typeof data[i]==='number'){const x=mapX(i),y=mapY(data[i]);if(lastX===undefined)ctx.moveTo(x,y);else ctx.lineTo(x,y);lastX=x;}}ctx.stroke();};drawLine(portfolioCtx,strategyValues,strategyColor,2);drawLine(portfolioCtx,buyHoldValues,buyHoldColor,1);}
+    </script>
+</body>
+</html>
