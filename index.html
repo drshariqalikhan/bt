@@ -42,9 +42,27 @@
 
         /* Main App Layout */
         html { height: 100svh; }
-        body { display: flex; flex-direction: column; min-height: 100svh; padding-top: calc(var(--bulma-navbar-height) + env(safe-area-inset-top)); }
-        .navbar.is-fixed-top { padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-        .section { flex-grow: 1; display: flex; flex-direction: column; padding: 1rem; height: 1px; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+        body { 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100svh; 
+            padding-top: calc(var(--bulma-navbar-height) + env(safe-area-inset-top));
+        }
+        
+        .navbar.is-fixed-top {
+            padding-top: env(safe-area-inset-top);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+
+        .section { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 1rem; 
+            height: 1px;
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+        }
         #appContainer { flex-grow: 1; display: flex; gap: 10px; flex-direction: column; }
         @media screen and (min-width: 769px) { #appContainer { flex-direction: row; } }
         #left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
@@ -53,21 +71,13 @@
         #left-panel .chart-wrapper { flex: 1 1 0; min-height: 0; }
         .chart-wrapper { padding: 0; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        
-        /* --- CUSTOM PICKER STYLES --- */
-        .picker-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: flex-end; z-index: 100; }
-        .picker-modal.is-active { display: flex; }
-        .picker-card { background-color: var(--dark-bg-2); width: 100%; max-width: 500px; border-top-left-radius: 12px; border-top-right-radius: 12px; }
-        .picker-header { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid var(--dark-border); }
-        .picker-header button { background: none; border: none; color: #3298dc; font-size: 1rem; cursor: pointer; }
-        .picker-content { display: flex; padding: 20px 0; height: 240px; position: relative; }
-        .picker-wheels { display: flex; flex-grow: 1; overflow: hidden; }
-        .picker-wheel { flex: 1; overflow-y: scroll; scroll-snap-type: y mandatory; -webkit-overflow-scrolling: touch; }
-        .picker-wheel::-webkit-scrollbar { display: none; }
-        .picker-item { height: 44px; display: flex; justify-content: center; align-items: center; scroll-snap-align: center; color: var(--light-text); font-size: 1.2rem; }
-        .picker-selection-indicator { position: absolute; top: 50%; left: 0; right: 0; height: 44px; margin-top: -22px; border-top: 1px solid var(--dark-border); border-bottom: 1px solid var(--dark-border); pointer-events: none; }
-        input[readonly] { cursor: pointer; }
 
+        /* --- iOS KEYBOARD FIXES --- */
+        input, textarea, select {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+            cursor: pointer !important;
+        }
     </style>
 </head>
 <body>
@@ -81,19 +91,26 @@
             <div class="navbar-start">
                 <div class="navbar-item">
                     <div class="field is-grouped">
-                        <p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US" placeholder="Select a Ticker..." aria-label="Ticker Symbol Input" readonly></p>
+                        <p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US" placeholder="e.g., AAPL.US" aria-label="Ticker Symbol Input"></p>
                         <p class="control"><button id="fetchButton" class="button is-info" aria-label="Fetch stock data">Fetch</button></p>
                     </div>
                 </div>
                 <div class="navbar-item has-dropdown" id="settingsDropdown">
                     <a class="navbar-link">Settings</a>
                     <div class="navbar-dropdown">
-                        <div class="navbar-item"><div><label for="discountRateInput" class="label is-small">Discount Rate (%)</label><input class="input is-small" type="text" id="discountRateInput" value="9.50" aria-label="Discount Rate" readonly></div></div>
-                        <div class="navbar-item"><div><label for="terminalGrowthInput" class="label is-small">Terminal Growth Rate (%)</label><input class="input is-small" type="text" id="terminalGrowthInput" value="2.50" aria-label="Terminal Growth Rate" readonly></div></div>
+                        <div class="navbar-item"><div><label for="fastEmaSlider" class="label is-small">Fast EMA: <span id="fastEmaValue">10</span> weeks</label><input id="fastEmaSlider" class="slider is-fullwidth is-info" type="range" min="2" max="50" value="10" aria-label="Fast EMA period"></div></div>
+                        <div class="navbar-item"><div><label for="slowEmaSlider" class="label is-small">Slow EMA: <span id="slowEmaValue">20</span> weeks</label><input id="slowEmaSlider" class="slider is-fullwidth is-success" type="range" min="5" max="100" value="20" aria-label="Slow EMA period"></div></div>
                         <hr class="navbar-divider">
-                        <div class="navbar-item"><div><label for="timePeriodSelector" class="label is-small">Time Period</label><div class="select is-fullwidth"><select id="timePeriodSelector"><option value="all">All Time</option><option value="10yr">10 Years</option><option value="7yr">7 Years</option><option value="5yr" selected>5 Years</option><option value="3yr">3 Years</option><option value="1yr">1 Year</option></select></div></div></div>
+                        <div class="navbar-item"><div><label for="timePeriodSelector" class="label is-small">Time Period</label><div class="select is-fullwidth">
+                            <select id="timePeriodSelector" aria-label="Chart Time Period">
+                                <option value="all">All Time</option><option value="10yr">10 Years</option><option value="7yr">7 Years</option><option value="5yr" selected>5 Years</option><option value="3yr">3 Years</option><option value="1yr">1 Year</option><option value="ytd">YTD</option><option value="mtd">MTD</option>
+                            </select>
+                        </div></div></div>
                         <hr class="navbar-divider">
-                        <div class="navbar-item"><div><label for="fairValueInput" class="label is-small">DCF Fair Value</label><input class="input is-small" type="text" id="fairValueInput" placeholder="Auto-calculated..." readonly></div></div>
+                        <div class="navbar-item"><div><label class="label is-small">DCF Fair Value Calculation</label></div></div>
+                        <div class="navbar-item"><div><label for="discountRateInput" class="label is-small">Discount Rate (%)</label><input class="input is-small" type="number" id="discountRateInput" value="9.5" aria-label="Discount Rate"></div></div>
+                        <div class="navbar-item"><div><label for="terminalGrowthInput" class="label is-small">Terminal Growth Rate (%)</label><input class="input is-small" type="number" id="terminalGrowthInput" value="2.5" aria-label="Terminal Growth Rate"></div></div>
+                        <div class="navbar-item"><div class="field"><p class="control is-expanded"><input class="input is-small" type="number" id="fairValueInput" placeholder="Auto-calculated..." readonly aria-label="Calculated Fair Value"></p></div></div>
                         <hr class="navbar-divider">
                         <a class="navbar-item clickable-button" id="insightsButton">Analyze Insights</a>
                         <a class="navbar-item clickable-button" id="channelButton">Draw Trend Channel</a>
@@ -111,13 +128,9 @@
         <div id="statusMessage" class="has-text-centered mt-2" role="status" aria-live="polite"></div>
     </section>
     
-    <div class="modal" id="insightsModal"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Analysis</p><button class="delete" aria-label="close"></button></header><section class="modal-card-body" id="insightsResult"></section></div></div>
-
-    <div id="pickerModal" class="picker-modal">
-        <div class="picker-card">
-            <div class="picker-header"><button id="pickerCancel">Cancel</button><button id="pickerDone">Done</button></div>
-            <div class="picker-content"><div class="picker-wheels" id="pickerWheelsContainer"></div><div class="picker-selection-indicator"></div></div>
-        </div>
+    <div class="modal" id="insightsModal">
+        <div class="modal-background"></div>
+        <div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Analysis</p><button class="delete" aria-label="close"></button></header><section class="modal-card-body" id="insightsResult"></section></div>
     </div>
 
     <script>
@@ -127,26 +140,23 @@
             const LAST_TICKER_KEY = 'qualitystock_lastTicker';
             let allDates = [], allPrices = [], dates = [], prices = [];
             let trendChannel = null, fairValue = null;
-            let iwquHoldings = [];
-            let pickerCallback = null;
 
             // --- DOM ELEMENT REFERENCES ---
-            let tickerInput, fetchButton, statusMessage, insightsModal, insightsResult,
-                discountRateInput, terminalGrowthInput, fairValueInput, timePeriodSelector,
-                priceChartContainer, priceCanvas, priceCtx, macdChartContainer, macdCanvas, macdCtx,
-                pickerModal, pickerWheelsContainer, pickerCancel, pickerDone;
+            let tickerInput, fetchButton, fastEmaSlider, fastEmaValue, slowEmaSlider, slowEmaValue,
+                statusMessage, timePeriodSelector, priceChartContainer, priceCanvas, priceCtx,
+                macdChartContainer, macdCanvas, macdCtx, insightsButton, insightsModal, insightsResult,
+                channelButton, qualityScreenButton, fairValueInput, discountRateInput, terminalGrowthInput;
 
             // --- PRIMARY EVENT LISTENER ---
             document.addEventListener('DOMContentLoaded', () => {
-                // Assign all DOM elements
+                // Assign all DOM elements now that they are loaded
                 tickerInput = document.getElementById('tickerInput');
                 fetchButton = document.getElementById('fetchButton');
+                fastEmaSlider = document.getElementById('fastEmaSlider');
+                fastEmaValue = document.getElementById('fastEmaValue');
+                slowEmaSlider = document.getElementById('slowEmaSlider');
+                slowEmaValue = document.getElementById('slowEmaValue');
                 statusMessage = document.getElementById('statusMessage');
-                insightsModal = document.getElementById('insightsModal');
-                insightsResult = document.getElementById('insightsResult');
-                discountRateInput = document.getElementById('discountRateInput');
-                terminalGrowthInput = document.getElementById('terminalGrowthInput');
-                fairValueInput = document.getElementById('fairValueInput');
                 timePeriodSelector = document.getElementById('timePeriodSelector');
                 priceChartContainer = document.getElementById('priceChartContainer');
                 priceCanvas = document.getElementById('priceChart');
@@ -154,39 +164,60 @@
                 macdChartContainer = document.getElementById('macdChartContainer');
                 macdCanvas = document.getElementById('macdChart');
                 macdCtx = macdCanvas.getContext('2d');
-                pickerModal = document.getElementById('pickerModal');
-                pickerWheelsContainer = document.getElementById('pickerWheelsContainer');
-                pickerCancel = document.getElementById('pickerCancel');
-                pickerDone = document.getElementById('pickerDone');
+                insightsButton = document.getElementById('insightsButton');
+                insightsModal = document.getElementById('insightsModal');
+                insightsResult = document.getElementById('insightsResult');
+                channelButton = document.getElementById('channelButton');
+                qualityScreenButton = document.getElementById('qualityScreenButton');
+                fairValueInput = document.getElementById('fairValueInput');
+                discountRateInput = document.getElementById('discountRateInput');
+                terminalGrowthInput = document.getElementById('terminalGrowthInput');
 
                 // --- EVENT LISTENERS ---
                 fetchButton.addEventListener('click', fetchData);
+                tickerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fetchData(); });
+                discountRateInput.addEventListener('change', fetchData);
+                terminalGrowthInput.addEventListener('change', fetchData);
                 timePeriodSelector.addEventListener('change', () => { trendChannel = null; processAndDraw(); });
-                
-                // PICKER TRIGGERS
-                tickerInput.addEventListener('click', handleTickerPicker);
-                discountRateInput.addEventListener('click', handleDiscountRatePicker);
-                terminalGrowthInput.addEventListener('click', handleTerminalGrowthPicker);
-
-                // PICKER ACTIONS
-                pickerCancel.addEventListener('click', hidePicker);
-                pickerDone.addEventListener('click', handlePickerDone);
-                pickerModal.addEventListener('click', (e) => { if (e.target === pickerModal) hidePicker(); });
-
-                // Other listeners
-                document.getElementById('qualityScreenButton').addEventListener('click', fetchQualityHoldings);
-                document.getElementById('insightsButton').addEventListener('click', calculateAndShowInsights);
-                document.getElementById('channelButton').addEventListener('click', () => { trendChannel = calculateTrendChannel(prices); processAndDraw(); });
+                fastEmaSlider.addEventListener('change', processAndDraw);
+                slowEmaSlider.addEventListener('change', processAndDraw);
+                fastEmaSlider.addEventListener('input', () => fastEmaValue.textContent = `${fastEmaSlider.value} weeks`);
+                slowEmaSlider.addEventListener('input', () => slowEmaValue.textContent = `${slowEmaSlider.value} weeks`);
+                insightsButton.addEventListener('click', calculateAndShowInsights);
+                qualityScreenButton.addEventListener('click', fetchQualityHoldings);
                 insightsModal.querySelector('.modal-background').addEventListener('click', () => insightsModal.classList.remove('is-active'));
                 insightsModal.querySelector('.delete').addEventListener('click', () => insightsModal.classList.remove('is-active'));
+                channelButton.addEventListener('click', () => { trendChannel = calculateTrendChannel(prices); processAndDraw(); });
                 
-                // Dropdown Menu Logic
+                // Dropdown and Burger Menu Logic
                 const settingsDropdown = document.getElementById('settingsDropdown');
+                const burger = document.querySelector('.navbar-burger');
+                const menu = document.getElementById(burger.dataset.target);
+                const closeAllMenus = () => {
+                    settingsDropdown.classList.remove('is-active');
+                    burger.classList.remove('is-active');
+                    menu.classList.remove('is-active');
+                };
                 settingsDropdown.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    settingsDropdown.classList.toggle('is-active');
+                    const isActive = settingsDropdown.classList.contains('is-active');
+                    closeAllMenus();
+                    if (!isActive) settingsDropdown.classList.add('is-active');
                 });
-                document.addEventListener('click', () => { settingsDropdown.classList.remove('is-active'); });
+                burger.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const isActive = burger.classList.contains('is-active');
+                    closeAllMenus();
+                    if (!isActive) {
+                        burger.classList.add('is-active');
+                        menu.classList.add('is-active');
+                    }
+                });
+                document.addEventListener('click', (event) => {
+                    if (!settingsDropdown.contains(event.target) && !burger.contains(event.target)) {
+                        closeAllMenus();
+                    }
+                });
                 
                 // PWA & App Initialization
                 setupPWA();
@@ -195,115 +226,13 @@
                 fetchData();
             });
             
-            // --- PICKER LOGIC ---
-            function showPicker(columnsData, targetInput, callback) {
-                pickerWheelsContainer.innerHTML = '';
-                columnsData.forEach(columnData => {
-                    const wheel = document.createElement('div');
-                    wheel.className = 'picker-wheel';
-                    
-                    const paddingDiv = '<div class="picker-item" style="height: 98px;"></div>';
-                    wheel.innerHTML += paddingDiv;
-
-                    columnData.forEach(item => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'picker-item';
-                        itemDiv.textContent = item;
-                        wheel.appendChild(itemDiv);
-                    });
-
-                    wheel.innerHTML += paddingDiv;
-                    pickerWheelsContainer.appendChild(wheel);
-
-                    let initialValue = targetInput.value;
-                    const initialIndex = columnData.findIndex(item => item == initialValue);
-                    
-                    if (initialIndex !== -1) {
-                        setTimeout(() => { wheel.scrollTop = initialIndex * 44; }, 0);
-                    }
-                });
-
-                pickerCallback = callback;
-                pickerModal.classList.add('is-active');
-            }
-
-            function hidePicker() {
-                pickerModal.classList.remove('is-active');
-                pickerCallback = null;
-            }
-
-            function handlePickerDone() {
-                const wheels = pickerWheelsContainer.querySelectorAll('.picker-wheel');
-                const selectedValues = [];
-
-                wheels.forEach(wheel => {
-                    const scroll_top = wheel.scrollTop;
-                    const selectedIndex = Math.round(scroll_top / 44);
-                    const items = wheel.querySelectorAll('.picker-item');
-                    const selectedItem = items[selectedIndex + 1]; // +1 because we have one padding div at the top now
-                    selectedValues.push(selectedItem ? selectedItem.textContent : '');
-                });
-
-                if (pickerCallback) {
-                    pickerCallback(selectedValues.join(''));
-                }
-                hidePicker();
-            }
-
-            async function handleTickerPicker() {
-                if (iwquHoldings.length === 0) {
-                    statusMessage.textContent = 'Loading quality stock list...';
-                    try {
-                        const url = 'https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';
-                        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-                        const response = await fetch(proxyUrl);
-                        const csvData = await response.text();
-                        const lines = csvData.trim().split('\n');
-                        const dataStartIndex = lines.findIndex(line => line.trim().toLowerCase().startsWith('ticker,'));
-                        const holdingsData = lines.slice(dataStartIndex + 1);
-                        
-                        iwquHoldings = holdingsData.map(line => {
-                            const columns = line.split(',');
-                            const ticker = columns[0]?.replace(/"/g, '').split(' ')[0].trim();
-                            return ticker ? `${ticker}.US` : null;
-                        }).filter(Boolean);
-                        statusMessage.textContent = 'Ticker list loaded.';
-                    } catch (error) {
-                        statusMessage.textContent = 'Error loading tickers.';
-                        console.error("Error fetching holdings for picker:", error);
-                        return;
-                    }
-                }
-                
-                showPicker([iwquHoldings], tickerInput, (selectedValue) => {
-                    tickerInput.value = selectedValue;
-                    fetchData();
-                });
-            }
-
-            function handleDiscountRatePicker() {
-                const rates = Array.from({length: 41}, (_, i) => (5 + i * 0.25).toFixed(2));
-                showPicker([rates], discountRateInput, (selectedValue) => {
-                    discountRateInput.value = selectedValue;
-                    fetchData();
-                });
-            }
-
-            function handleTerminalGrowthPicker() {
-                const rates = Array.from({length: 21}, (_, i) => (1.5 + i * 0.05).toFixed(2));
-                showPicker([rates], terminalGrowthInput, (selectedValue) => {
-                    terminalGrowthInput.value = selectedValue;
-                    fetchData();
-                });
-            }
-
-            // --- CORE APP LOGIC ---
+            // --- ALL FUNCTIONS ---
             function setupPWA() { if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered'), err => console.log('SW registration failed: ', err)); }); } }
             
             async function fetchData() {
                 trendChannel = null; fairValue = null; fairValueInput.value = '';
                 const ticker = tickerInput.value.trim().toUpperCase();
-                if (!ticker || ticker.includes("...")) { statusMessage.textContent = "Please select a ticker."; return; }
+                if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
                 statusMessage.textContent = `Fetching price data for ${ticker}...`;
                 clearCharts();
                 try {
@@ -348,32 +277,39 @@
                     const calculatedFV = calculateDCF(epsTTM, epsNext5Y / 100, terminalGrowthRate, discountRate);
                     fairValue = calculatedFV;
                     fairValueInput.value = fairValue.toFixed(2);
-                    statusMessage.textContent = `Successfully calculated Fair Value: $${fairValue.toFixed(2)}`;
+                    statusMessage.textContent = `Successfully calculated Fair Value of ${ticker}: $${fairValue.toFixed(2)}`;
                 } catch (error) { console.error(`Fair Value Calculation Error: ${error.message}`); statusMessage.textContent = `Could not calculate Fair Value. ${error.message}`; fairValue = null; fairValueInput.value = ''; }
             }
 
-            function processAndDraw() { if (allPrices.length === 0) return; const fastPeriod = 10, slowPeriod = 20; const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), sma50: calculateSMA(allPrices, 50), sma100: calculateSMA(allPrices, 100), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const startIndex = getFilterStartIndex(); dates = allDates.slice(startIndex); prices = allPrices.slice(startIndex); const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), sma50: full.sma50.slice(startIndex), sma100: full.sma100.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) }; if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data available for the selected time period."; return; } if (!statusMessage.textContent.includes('Fair Value')) { statusMessage.textContent = `Displaying ${tickerInput.value.trim().toUpperCase()}`; } drawPriceChart(sliced, fastPeriod, slowPeriod, signals, startIndex); drawMacdChart(sliced); }
+            function processAndDraw() { if (allPrices.length === 0) return; const fastPeriod = parseInt(fastEmaSlider.value, 10), slowPeriod = parseInt(slowEmaSlider.value, 10); const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), sma50: calculateSMA(allPrices, 50), sma100: calculateSMA(allPrices, 100), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const startIndex = getFilterStartIndex(); dates = allDates.slice(startIndex); prices = allPrices.slice(startIndex); const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), sma50: full.sma50.slice(startIndex), sma100: full.sma100.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) }; if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data available for the selected time period."; return; } if (!statusMessage.textContent.includes('Fair Value')) { statusMessage.textContent = `Displaying ${tickerInput.value.trim().toUpperCase()}`; } drawPriceChart(sliced, fastPeriod, slowPeriod, signals, startIndex); drawMacdChart(sliced); }
             
-            function clearCharts() { priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height); macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height); }
-            
-            function findCrossoverSignals(fastEma, slowEma, macdLine, signalLine) { const upArrowIndices = [], downArrowIndices = []; for (let i = 1; i < fastEma.length; i++) { if (fastEma[i] > slowEma[i]) { if (macdLine[i-1] <= signalLine[i-1] && macdLine[i] > signalLine[i]) { upArrowIndices.push(i); } if (macdLine[i-1] >= signalLine[i-1] && macdLine[i] < signalLine[i]) { downArrowIndices.push(i); } } } return { upArrowIndices, downArrowIndices }; }
+            function findCrossoverSignals(fastEma, slowEma, macdLine, signalLine) {
+                const upArrowIndices = [], downArrowIndices = [];
+                for (let i = 1; i < fastEma.length; i++) { 
+                    if (fastEma[i] > slowEma[i]) {
+                        if (macdLine[i-1] <= signalLine[i-1] && macdLine[i] > signalLine[i]) { upArrowIndices.push(i); }
+                        if (macdLine[i-1] >= signalLine[i-1] && macdLine[i] < signalLine[i]) { downArrowIndices.push(i); }
+                    }
+                }
+                return { upArrowIndices, downArrowIndices };
+            }
+
+            async function fetchQualityHoldings() { insightsModal.querySelector('.modal-card-title').textContent = 'Fetching Data...'; insightsResult.innerHTML = `<p>Fetching top holdings from iShares IWQU...</p>`; insightsModal.classList.add('is-active'); const url = 'https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund'; const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`; try { const response = await fetch(proxyUrl); if (!response.ok) throw new Error(`Network Error fetching holdings: ${response.statusText}`); const csvData = await response.text(); const lines = csvData.trim().split('\n'); const dataStartIndex = lines.findIndex(line => line.trim().startsWith('Ticker,')); if (dataStartIndex === -1) throw new Error("Could not find holdings data header in CSV."); const holdingsData = lines.slice(dataStartIndex + 1, dataStartIndex + 21); const top20 = holdingsData.map(line => { const columns = line.split(','); const baseTicker = columns[0]?.replace(/"/g, '').split(' ')[0] || null; const name = columns[1]?.replace(/"/g, '') || 'N/A'; return { baseTicker, name }; }).filter(h => h.baseTicker); displayQualityHoldings(top20); } catch (error) { insightsResult.innerHTML = `<p class="has-text-danger">Error fetching quality holdings: ${error.message}</p>`; } }
+            function displayQualityHoldings(holdings) { insightsModal.querySelector('.modal-card-title').textContent = 'Top 20 Quality Holdings (IWQU)'; let html = '<p>Click a ticker to load its chart:</p><ul class="mt-4">'; holdings.forEach(holding => { const stooqTicker = `${holding.baseTicker}.US`; html += `<li><a href="#" data-ticker="${stooqTicker}">${holding.baseTicker} - ${holding.name}</a></li>`; }); html += '</ul>'; insightsResult.innerHTML = html; insightsResult.querySelectorAll('a').forEach(link => { link.addEventListener('click', (event) => { event.preventDefault(); tickerInput.value = event.target.dataset.ticker; insightsModal.classList.remove('is-active'); fetchData(); }); }); }
+            function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { let pvSum = 0; let currentEps = eps; for (let i = 1; i <= 5; i++) { currentEps *= (1 + growthRate5Y); pvSum += currentEps / Math.pow(1 + discountRate, i); } const terminalEps = currentEps * (1 + terminalGrowthRate); const terminalValue = terminalEps / (discountRate - terminalGrowthRate); const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5); return pvSum + pvTerminalValue; }
+            function calculateAndShowInsights() { if (allPrices.length < 5) { insightsResult.innerHTML = `<p>Not enough historical data.</p>`; insightsModal.classList.add('is-active'); return; } insightsModal.querySelector('.modal-card-title').textContent = 'Trend Analysis'; const fastPeriod = parseInt(fastEmaSlider.value, 10), slowPeriod = parseInt(slowEmaSlider.value, 10); const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const maxRises = [], maxFalls = []; let fallExceedsRiseCount = 0; downArrowIndices.forEach(downIndex => { const nextUpIndex = upArrowIndices.find(upIndex => upIndex > downIndex); if (nextUpIndex && downIndex > 0) { const anchorPrice = allPrices[downIndex - 1]; const periodPrices = allPrices.slice(downIndex, nextUpIndex + 1); if (periodPrices.length > 0 && anchorPrice > 0) { const risePercent = ((Math.max(...periodPrices) - anchorPrice) / anchorPrice) * 100; const fallPercent = ((Math.min(...periodPrices) - anchorPrice) / anchorPrice) * 100; maxRises.push(risePercent); maxFalls.push(fallPercent); if (Math.abs(fallPercent) > risePercent) fallExceedsRiseCount++; } } }); let triggerCount = 0, outcomeCount = 0; for (let i = 1; i < allPrices.length - 4; i++) { const isDownArrow = (full.fastEma[i] > full.slowEma[i]) && (full.macdLine[i-1] >= full.signalLine[i-1]) && (full.macdLine[i] < full.signalLine[i]); if (isDownArrow) { const hist1 = full.histogram[i+1], hist2 = full.histogram[i+2], hist3 = full.histogram[i+3]; const isStrengtheningDownwardMomentum = (hist1 < 0 && hist2 < 0 && hist3 < 0) && (hist2 < hist1) && (hist3 < hist2); if (isStrengtheningDownwardMomentum) { triggerCount++; for (let j = i + 4; j < allPrices.length; j++) { if (full.fastEma[j-1] >= full.slowEma[j-1] && full.fastEma[j] < full.slowEma[j]) { outcomeCount++; break; } } } } } let htmlResult = `<p>Based on the current settings (Fast EMA: ${fastPeriod}, Slow EMA: ${slowPeriod}):</p><hr>`; if (maxRises.length > 0) { const avgMaxRise = maxRises.reduce((a, b) => a + b, 0) / maxRises.length; const avgMaxFall = maxFalls.reduce((a, b) => a + b, 0) / maxFalls.length; const likelihood = (fallExceedsRiseCount / maxRises.length) * 100; htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong></p><ul><li><strong>Periods found:</strong> ${maxRises.length}</li><li><strong>Avg Max Rise %:</strong> <span style="color: #23d160;">${avgMaxRise.toFixed(2)}%</span></li><li><strong>Avg Max Fall %:</strong> <span style="color: #ff3860;">${avgMaxFall.toFixed(2)}%</span></li><li style="margin-top: 8px;"><strong>Likelihood of fall > rise:</strong> ${likelihood.toFixed(1)}%</li></ul>`; } else { htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong> No valid periods found.</p>`; } htmlResult += `<hr>`; if (triggerCount > 0) { const probability = (outcomeCount / triggerCount) * 100; htmlResult += `<p><strong>Bearish Momentum Analysis:</strong></p><ul><li><strong>Signals found:</strong> ${triggerCount}</li><li><strong>Probability of subsequent EMA cross:</strong> ${probability.toFixed(1)}%</li></ul><p class="is-size-7" style="color: var(--dim-text);"><em>A "signal" is a down-arrow followed by 3 successively <strong>more negative</strong> red MACD bars. The probability measures how often a bearish EMA cross occurred after such a signal.</em></p>`; } else { htmlResult += `<p><strong>Bearish Momentum Analysis:</strong> No signals found with the current settings.</p>`; } insightsResult.innerHTML = htmlResult; insightsModal.classList.add('is-active'); }
             function getFilterStartIndex() { const period = timePeriodSelector.value, totalPoints = allDates.length; const weeksInYear = 52; if (period === 'all') return 0; if (period === '10yr') return Math.max(0, totalPoints - (10 * weeksInYear)); if (period === '7yr') return Math.max(0, totalPoints - (7 * weeksInYear)); if (period === '5yr') return Math.max(0, totalPoints - (5 * weeksInYear)); if (period === '3yr') return Math.max(0, totalPoints - (3 * weeksInYear)); if (period === '1yr') return Math.max(0, totalPoints - (1 * weeksInYear)); const now = new Date(); let startDate; if (period === 'ytd') { startDate = new Date(now.getFullYear(), 0, 1); } else if (period === 'mtd') { startDate = new Date(now.getFullYear(), now.getMonth(), 1); } const foundIndex = allDates.findIndex(d => new Date(d) >= startDate); return foundIndex !== -1 ? foundIndex : totalPoints; }
             function calculateSMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const sma = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; sma[period - 1] = sum / period; for (let i = period; i < data.length; i++) { sum = sum - data[i - period] + data[i]; sma[i] = sum / period; } return sma; }
             function calculateEMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const k = 2 / (period + 1); const ema = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; ema[period - 1] = sum / period; for (let i = period; i < data.length; i++) { if (ema[i-1] !== null) { ema[i] = (data[i] * k) + (ema[i - 1] * (1 - k)); } } return ema; }
             function calculateMACD(data, p12=12, p26=26, pSignal=9) { const ema12 = calculateEMA(data, p12); const ema26 = calculateEMA(data, p26); const macdLine = ema26.map((v, i) => v !== null && ema12[i] !== null ? ema12[i] - v : null); const signalLine = calculateEMA(macdLine, pSignal); const histogram = signalLine.map((v, i) => v !== null && macdLine[i] !== null ? macdLine[i] - v : null); return { macdLine, signalLine, histogram }; }
-            function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { let pvSum = 0; let currentEps = eps; for (let i = 1; i <= 5; i++) { currentEps *= (1 + growthRate5Y); pvSum += currentEps / Math.pow(1 + discountRate, i); } const terminalEps = currentEps * (1 + terminalGrowthRate); const terminalValue = terminalEps / (discountRate - terminalGrowthRate); const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5); return pvSum + pvTerminalValue; }
-
-            function drawPriceChart(slicedData, fastPeriod, slowPeriod, signals, startIndex) { const { fastEma, slowEma, sma50, sma100 } = slicedData; const w = priceChartContainer.clientWidth, h = priceChartContainer.clientHeight; if (w <= 0 || h <= 0) return; priceCanvas.width = w * devicePixelRatio; priceCanvas.height = h * devicePixelRatio; priceCtx.scale(devicePixelRatio, devicePixelRatio); priceCtx.clearRect(0, 0, w, h); let allData = [...prices, ...fastEma.filter(v=>v), ...slowEma.filter(v=>v), ...sma50.filter(v=>v), ...sma100.filter(v=>v)]; if (fairValue !== null) { allData.push(fairValue); } if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; priceCtx.font = "12px sans-serif"; priceCtx.textAlign = 'right'; priceCtx.fillStyle = '#a0a0a0'; for (let i = 0; i <= 5; i++) { const val = minY + (i / 5) * (maxY - minY); const y = mapY(val); priceCtx.beginPath(); priceCtx.strokeStyle = '#444'; priceCtx.lineWidth = 0.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(margin.left + chartW, y); priceCtx.stroke(); priceCtx.fillText(val.toFixed(2), margin.left - 8, y + 4); } const xTickStep = Math.max(1, Math.floor(prices.length / Math.floor(chartW / 100))); for (let i = 0; i < prices.length; i += xTickStep) { priceCtx.textAlign = 'center'; priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20); } drawLine(priceCtx, prices, mapX, mapY, '#a0a0a0', 1.5); drawLine(priceCtx, fastEma, mapX, mapY, '#3273dc'); drawLine(priceCtx, slowEma, mapX, mapY, '#23d160'); drawLine(priceCtx, sma50, mapX, mapY, '#ff9800'); drawLine(priceCtx, sma100, mapX, mapY, '#c56bf0'); if (trendChannel) { priceCtx.beginPath(); priceCtx.setLineDash([5, 5]); priceCtx.strokeStyle = 'rgba(50, 152, 220, 0.7)'; priceCtx.lineWidth = 1; const y1_upper = mapY(trendChannel.slope * 0 + trendChannel.upperIntercept); const y2_upper = mapY(trendChannel.slope * (prices.length - 1) + trendChannel.upperIntercept); priceCtx.moveTo(mapX(0), y1_upper); priceCtx.lineTo(mapX(prices.length - 1), y2_upper); const y1_lower = mapY(trendChannel.slope * 0 + trendChannel.lowerIntercept); const y2_lower = mapY(trendChannel.slope * (prices.length - 1) + trendChannel.lowerIntercept); priceCtx.moveTo(mapX(0), y1_lower); priceCtx.lineTo(mapX(prices.length - 1), y2_lower); priceCtx.stroke(); priceCtx.setLineDash([]); } if (fairValue !== null && fairValue >= minY && fairValue <= maxY) { const y = mapY(fairValue); priceCtx.beginPath(); priceCtx.setLineDash([4, 4]); priceCtx.strokeStyle = '#ffd700'; priceCtx.lineWidth = 1.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(w - margin.right, y); priceCtx.stroke(); priceCtx.setLineDash([]); priceCtx.font = "12px sans-serif"; priceCtx.fillStyle = '#ffd700'; priceCtx.textAlign = 'left'; priceCtx.fillText('Fair Value', w - margin.right + 5, y + 4); } const arrowSize = 5, arrowOffset = 15; signals.upArrowIndices.forEach(fullIndex => { if (fullIndex >= startIndex) { const localIndex = fullIndex - startIndex; if (prices[localIndex]) { const x = mapX(localIndex); const y = mapY(prices[localIndex]) + arrowOffset; drawArrow(priceCtx, x, y, 'up', arrowSize, 'rgba(35, 209, 96, 0.9)'); } } }); signals.downArrowIndices.forEach(fullIndex => { if (fullIndex >= startIndex) { const localIndex = fullIndex - startIndex; if (prices[localIndex]) { const x = mapX(localIndex); const y = mapY(prices[localIndex]) - arrowOffset; drawArrow(priceCtx, x, y, 'down', arrowSize, 'rgba(255, 56, 96, 0.9)'); } } }); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; priceCtx.font = "14px sans-serif"; priceCtx.fillStyle = '#a0a0a0'; priceCtx.fillText('Price', legX, legY); priceCtx.fillStyle = '#3273dc'; priceCtx.fillText(`Fast EMA (10)`, legX, legY + sp); priceCtx.fillStyle = '#23d160'; priceCtx.fillText(`Slow EMA (20)`, legX, legY + sp * 2); priceCtx.fillStyle = '#ff9800'; priceCtx.fillText('50-week SMA', legX, legY + sp * 3); priceCtx.fillStyle = '#c56bf0'; priceCtx.fillText('100-week SMA', legX, legY + sp * 4); }
-            function drawMacdChart(slicedData) { const { macdLine, signalLine, histogram } = slicedData; const w = macdChartContainer.clientWidth, h = macdChartContainer.clientHeight; if (w <= 0 || h <= 0) return; macdCanvas.width = w * devicePixelRatio; macdCanvas.height = h * devicePixelRatio; macdCtx.scale(devicePixelRatio, devicePixelRatio); macdCtx.clearRect(0, 0, w, h); const allData = [...macdLine.filter(v=>v), ...signalLine.filter(v=>v), ...histogram.filter(v=>v)]; if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; const yZero = mapY(0); macdCtx.beginPath(); macdCtx.strokeStyle = '#a0a0a0'; macdCtx.lineWidth = 1; macdCtx.moveTo(margin.left, yZero); macdCtx.lineTo(margin.left + chartW, yZero); macdCtx.stroke(); const barW = Math.max(1, chartW / prices.length * 0.8); for(let i = 0; i < histogram.length; i++) { if(histogram[i] !== null) { const x = mapX(i) - barW / 2, y = mapY(histogram[i]); macdCtx.fillStyle = histogram[i] > 0 ? 'rgba(35, 209, 96, 0.7)' : 'rgba(255, 56, 96, 0.7)'; macdCtx.fillRect(x, y, barW, yZero - y); } } drawLine(macdCtx, macdLine, mapX, mapY, '#007bff'); drawLine(macdCtx, signalLine, mapX, mapY, '#fd7e14'); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; macdCtx.font = "14px sans-serif"; macdCtx.fillStyle = '#007bff'; macdCtx.fillText('MACD Line', legX, legY); macdCtx.fillStyle = '#fd7e14'; macdCtx.fillText('Signal Line', legX, legY + sp); }
-            const drawLine = (ctx, data, mapX, mapY, color, lineWidth = 1.5) => { ctx.beginPath(); ctx.lineWidth = lineWidth; ctx.strokeStyle = color; let first = true; for (let i = 0; i < data.length; i++) { if (data[i] !== null) { const x = mapX(i); const y = mapY(data[i]); if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); } } } ctx.stroke(); };
-            function drawArrow(ctx, x, y, direction, size, color) { ctx.beginPath(); ctx.fillStyle = color; if (direction === 'up') { ctx.moveTo(x, y); ctx.lineTo(x - size, y + size); ctx.lineTo(x + size, y + size); } else { ctx.moveTo(x, y); ctx.lineTo(x - size, y - size); ctx.lineTo(x + size, y - size); } ctx.closePath(); ctx.fill(); }
-            async function fetchQualityHoldings() { insightsModal.classList.add('is-active'); insightsResult.innerHTML = '<p>Loading top 20 quality holdings...</p>'; try { const url = 'https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund'; const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`; const response = await fetch(proxyUrl); if (!response.ok) throw new Error(`Network Error fetching holdings: ${response.statusText}`); const csvData = await response.text(); const lines = csvData.trim().split('\n'); const dataStartIndex = lines.findIndex(line => line.trim().toLowerCase().startsWith('ticker,')); if (dataStartIndex === -1) throw new Error("Could not find holdings data header in CSV."); const holdingsData = lines.slice(dataStartIndex + 1, dataStartIndex + 21); const top20 = holdingsData.map(line => { const columns = line.split(','); const baseTicker = columns[0]?.replace(/"/g, '').split(' ')[0] || null; const name = columns[1]?.replace(/"/g, '') || 'N/A'; return { baseTicker, name }; }).filter(h => h.baseTicker); displayQualityHoldings(top20); } catch (error) { insightsResult.innerHTML = `<p class="has-text-danger">Error fetching quality holdings: ${error.message}</p>`; } }
-            function displayQualityHoldings(holdings) { insightsModal.querySelector('.modal-card-title').textContent = 'Top 20 Quality Holdings (IWQU)'; let html = '<p>Click a ticker to load its chart:</p><ul class="mt-4">'; holdings.forEach(holding => { const stooqTicker = `${holding.baseTicker}.US`; html += `<li><a href="#" data-ticker="${stooqTicker}">${holding.baseTicker} - ${holding.name}</a></li>`; }); html += '</ul>'; insightsResult.innerHTML = html; insightsResult.querySelectorAll('a').forEach(link => { link.addEventListener('click', (event) => { event.preventDefault(); tickerInput.value = event.target.dataset.ticker; insightsModal.classList.remove('is-active'); fetchData(); }); }); }
-            function calculateAndShowInsights() { insightsModal.classList.add('is-active'); insightsResult.innerHTML = '<p>Running trend analysis...</p>'; if (allPrices.length < 50) { insightsResult.innerHTML = `<p>Not enough historical data for a meaningful analysis.</p>`; return; } const fastPeriod = 10, slowPeriod = 20; const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const maxRises = [], maxFalls = []; let fallExceedsRiseCount = 0; signals.downArrowIndices.forEach(downIndex => { const nextUpIndex = signals.upArrowIndices.find(upIndex => upIndex > downIndex); if (nextUpIndex && downIndex > 0) { const anchorPrice = allPrices[downIndex - 1]; const periodPrices = allPrices.slice(downIndex, nextUpIndex + 1); if (periodPrices.length > 0 && anchorPrice > 0) { const risePercent = ((Math.max(...periodPrices) - anchorPrice) / anchorPrice) * 100; const fallPercent = ((Math.min(...periodPrices) - anchorPrice) / anchorPrice) * 100; maxRises.push(risePercent); maxFalls.push(fallPercent); if (Math.abs(fallPercent) > risePercent) fallExceedsRiseCount++; } } }); let htmlResult = `<p>Based on a Fast EMA of ${fastPeriod} and Slow EMA of ${slowPeriod}:</p><hr>`; if (maxRises.length > 0) { const avgMaxRise = maxRises.reduce((a, b) => a + b, 0) / maxRises.length; const avgMaxFall = maxFalls.reduce((a, b) => a + b, 0) / maxFalls.length; const likelihood = (fallExceedsRiseCount / maxRises.length) * 100; htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong></p><ul><li><strong>Periods found:</strong> ${maxRises.length}</li><li><strong>Avg Max Rise %:</strong> <span style="color: #23d160;">${avgMaxRise.toFixed(2)}%</span></li><li><strong>Avg Max Fall %:</strong> <span style="color: #ff3860;">${avgMaxFall.toFixed(2)}%</span></li><li style="margin-top: 8px;"><strong>Likelihood of fall > rise:</strong> ${likelihood.toFixed(1)}%</li></ul>`; } else { htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong> No valid periods found.</p>`; } insightsResult.innerHTML = htmlResult; }
-            function calculateTrendChannel(data) { if (data.length < 10) return null; const extrema = findSignificantExtrema(data, 4); if (extrema.peaks.length < 2 || extrema.troughs.length < 2) return null; const baseSlope = calculateLinearRegression(data); let upperIntercept = -Infinity, lowerIntercept = Infinity; extrema.peaks.forEach(p => { upperIntercept = Math.max(upperIntercept, p.y - baseSlope * p.x); }); extrema.troughs.forEach(t => { lowerIntercept = Math.min(lowerIntercept, t.y - baseSlope * t.x); }); return { slope: baseSlope, upperIntercept, lowerIntercept }; }
             function findSignificantExtrema(data, window) { const peaks = [], troughs = []; for (let i = window; i < data.length - window; i++) { const isPeak = data.slice(i - window, i + window + 1).every(p => data[i] >= p); const isTrough = data.slice(i - window, i + window + 1).every(p => data[i] <= p); if (isPeak) peaks.push({ x: i, y: data[i] }); if (isTrough) troughs.push({ x: i, y: data[i] }); } return { peaks, troughs }; }
             function calculateLinearRegression(data) { let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0; const n = data.length; for (let i = 0; i < n; i++) { sumX += i; sumY += data[i]; sumXY += i * data[i]; sumXX += i * i; } const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX); return slope; }
-
+            function calculateTrendChannel(data) { if (data.length < 10) return null; const extrema = findSignificantExtrema(data, 4); if (extrema.peaks.length < 2 || extrema.troughs.length < 2) return null; const baseSlope = calculateLinearRegression(data); let upperIntercept = -Infinity, lowerIntercept = Infinity; extrema.peaks.forEach(p => { upperIntercept = Math.max(upperIntercept, p.y - baseSlope * p.x); }); extrema.troughs.forEach(t => { lowerIntercept = Math.min(lowerIntercept, t.y - baseSlope * t.x); }); return { slope: baseSlope, upperIntercept, lowerIntercept }; }
+            function clearCharts() { priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height); macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height); }
+            const drawLine = (ctx, data, mapX, mapY, color, lineWidth = 1.5) => { ctx.beginPath(); ctx.lineWidth = lineWidth; ctx.strokeStyle = color; let first = true; for (let i = 0; i < data.length; i++) { if (data[i] !== null) { const x = mapX(i); const y = mapY(data[i]); if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); } } } ctx.stroke(); };
+            function drawArrow(ctx, x, y, direction, size, color) { ctx.beginPath(); ctx.fillStyle = color; if (direction === 'up') { ctx.moveTo(x, y); ctx.lineTo(x - size, y + size); ctx.lineTo(x + size, y + size); } else { ctx.moveTo(x, y); ctx.lineTo(x - size, y - size); ctx.lineTo(x + size, y - size); } ctx.closePath(); ctx.fill(); }
+            function drawPriceChart(slicedData, fastPeriod, slowPeriod, signals, startIndex) { const { fastEma, slowEma, sma50, sma100 } = slicedData; const w = priceChartContainer.clientWidth, h = priceChartContainer.clientHeight; if (w <= 0 || h <= 0) return; priceCanvas.width = w * devicePixelRatio; priceCanvas.height = h * devicePixelRatio; priceCtx.scale(devicePixelRatio, devicePixelRatio); priceCtx.clearRect(0, 0, w, h); let allData = [...prices, ...fastEma.filter(v=>v), ...slowEma.filter(v=>v), ...sma50.filter(v=>v), ...sma100.filter(v=>v)]; if (fairValue !== null) { allData.push(fairValue); } if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; priceCtx.font = "12px sans-serif"; priceCtx.textAlign = 'right'; priceCtx.fillStyle = '#a0a0a0'; for (let i = 0; i <= 5; i++) { const val = minY + (i / 5) * (maxY - minY); const y = mapY(val); priceCtx.beginPath(); priceCtx.strokeStyle = '#444'; priceCtx.lineWidth = 0.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(margin.left + chartW, y); priceCtx.stroke(); priceCtx.fillText(val.toFixed(2), margin.left - 8, y + 4); } const xTickStep = Math.max(1, Math.floor(prices.length / Math.floor(chartW / 100))); for (let i = 0; i < prices.length; i += xTickStep) { priceCtx.textAlign = 'center'; priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20); } drawLine(priceCtx, prices, mapX, mapY, '#a0a0a0', 1.5); drawLine(priceCtx, fastEma, mapX, mapY, '#3273dc'); drawLine(priceCtx, slowEma, mapX, mapY, '#23d160'); drawLine(priceCtx, sma50, mapX, mapY, '#ff9800'); drawLine(priceCtx, sma100, mapX, mapY, '#c56bf0'); if (trendChannel) { priceCtx.beginPath(); priceCtx.setLineDash([5, 5]); priceCtx.strokeStyle = 'rgba(50, 152, 220, 0.7)'; priceCtx.lineWidth = 1; const y1_upper = mapY(trendChannel.slope * 0 + trendChannel.upperIntercept); const y2_upper = mapY(trendChannel.slope * (prices.length - 1) + trendChannel.upperIntercept); priceCtx.moveTo(mapX(0), y1_upper); priceCtx.lineTo(mapX(prices.length - 1), y2_upper); const y1_lower = mapY(trendChannel.slope * 0 + trendChannel.lowerIntercept); const y2_lower = mapY(trendChannel.slope * (prices.length - 1) + trendChannel.lowerIntercept); priceCtx.moveTo(mapX(0), y1_lower); priceCtx.lineTo(mapX(prices.length - 1), y2_lower); priceCtx.stroke(); priceCtx.setLineDash([]); } if (fairValue !== null && fairValue >= minY && fairValue <= maxY) { const y = mapY(fairValue); priceCtx.beginPath(); priceCtx.setLineDash([4, 4]); priceCtx.strokeStyle = '#ffd700'; priceCtx.lineWidth = 1.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(w - margin.right, y); priceCtx.stroke(); priceCtx.setLineDash([]); priceCtx.font = "12px sans-serif"; priceCtx.fillStyle = '#ffd700'; priceCtx.textAlign = 'left'; priceCtx.fillText('Fair Value', w - margin.right + 5, y + 4); } const arrowSize = 5, arrowOffset = 15; signals.upArrowIndices.forEach(fullIndex => { if (fullIndex >= startIndex) { const localIndex = fullIndex - startIndex; if (prices[localIndex]) { const x = mapX(localIndex); const y = mapY(prices[localIndex]) + arrowOffset; drawArrow(priceCtx, x, y, 'up', arrowSize, 'rgba(35, 209, 96, 0.9)'); } } }); signals.downArrowIndices.forEach(fullIndex => { if (fullIndex >= startIndex) { const localIndex = fullIndex - startIndex; if (prices[localIndex]) { const x = mapX(localIndex); const y = mapY(prices[localIndex]) - arrowOffset; drawArrow(priceCtx, x, y, 'down', arrowSize, 'rgba(255, 56, 96, 0.9)'); } } }); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; priceCtx.font = "14px sans-serif"; priceCtx.fillStyle = '#a0a0a0'; priceCtx.fillText('Price', legX, legY); priceCtx.fillStyle = '#3273dc'; priceCtx.fillText(`Fast EMA (${fastPeriod})`, legX, legY + sp); priceCtx.fillStyle = '#23d160'; priceCtx.fillText(`Slow EMA (${slowPeriod})`, legX, legY + sp * 2); priceCtx.fillStyle = '#ff9800'; priceCtx.fillText('50-week SMA', legX, legY + sp * 3); priceCtx.fillStyle = '#c56bf0'; priceCtx.fillText('100-week SMA', legX, legY + sp * 4); }
+            function drawMacdChart(slicedData) { const { macdLine, signalLine, histogram } = slicedData; const w = macdChartContainer.clientWidth, h = macdChartContainer.clientHeight; if (w <= 0 || h <= 0) return; macdCanvas.width = w * devicePixelRatio; macdCanvas.height = h * devicePixelRatio; macdCtx.scale(devicePixelRatio, devicePixelRatio); macdCtx.clearRect(0, 0, w, h); const allData = [...macdLine.filter(v=>v), ...signalLine.filter(v=>v), ...histogram.filter(v=>v)]; if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; const yZero = mapY(0); macdCtx.beginPath(); macdCtx.strokeStyle = '#a0a0a0'; macdCtx.lineWidth = 1; macdCtx.moveTo(margin.left, yZero); macdCtx.lineTo(margin.left + chartW, yZero); macdCtx.stroke(); const barW = Math.max(1, chartW / prices.length * 0.8); for(let i = 0; i < histogram.length; i++) { if(histogram[i] !== null) { const x = mapX(i) - barW / 2, y = mapY(histogram[i]); macdCtx.fillStyle = histogram[i] > 0 ? 'rgba(35, 209, 96, 0.7)' : 'rgba(255, 56, 96, 0.7)'; macdCtx.fillRect(x, y, barW, yZero - y); } } drawLine(macdCtx, macdLine, mapX, mapY, '#007bff'); drawLine(macdCtx, signalLine, mapX, mapY, '#fd7e14'); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; macdCtx.font = "14px sans-serif"; macdCtx.fillStyle = '#007bff'; macdCtx.fillText('MACD Line', legX, legY); macdCtx.fillStyle = '#fd7e14'; macdCtx.fillText('Signal Line', legX, legY + sp); }
         })();
     </script>
 </body>
