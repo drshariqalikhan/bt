@@ -1,42 +1,48 @@
-const CACHE_NAME = 'stock-viewer-v1';
-const assetsToCache = [
-    './',
-    './index.html',
-    './manifest.json',
-    'https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css',
-    './icons/icon-192x192.png',
-    './icons/icon-512x512.png'
+const CACHE_NAME = 'qualitystock-v3'; // Incremented version for update
+
+// Note: We only need to cache index.html here, since CSS and JS are inside it.
+const urlsToCache = [
+  '/',
+  'index.html',
+  'https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css'
 ];
 
-// Install event: cache the application shell
+// Install Event: Cache the app shell.
 self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Opened cache and caching app shell');
-                return cache.addAll(assetsToCache);
-            })
-    );
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Service Worker: Caching app shell');
+        return cache.addAll(urlsToCache);
+      })
+  );
 });
 
-// Fetch event: serve cached content when offline
+// Activate Event: Clean up old caches.
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Service Worker: Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+});
+
+// Fetch Event: Serve from cache first, then fall back to network.
 self.addEventListener('fetch', event => {
-    // We only want to cache GET requests.
-    if (event.request.method !== 'GET') {
-        return;
-    }
+  if (event.request.method !== 'GET') return;
 
-    event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                // Cache hit - return response from cache
-                if (response) {
-                    return response;
-                }
-
-                // Not in cache - go to network
-                return fetch(event.request);
-            }
-        )
-    );
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) return response; // Serve from cache
+        return fetch(event.request); // Fallback to network
+      })
+  );
 });
