@@ -1,6 +1,6 @@
 {
-  "name": "Stock Chart Viewer",
-  "short_name": "Stock Viewer",
+  "name": "QualityStock Viewer",
+  "short_name": "QualityStock",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1a1d21",
