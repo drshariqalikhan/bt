@@ -16,7 +16,7 @@
     <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
 
-    <!-- REVISED STYLES -->
+    <!-- FINAL STYLES WITH iOS FIXES -->
     <style>
         /* Base Theme */
         :root { --dark-bg-1: #1a1d21; --dark-bg-2: #272a2e; --dark-border: #444; --light-text: #f0f0f0; --dim-text: #a0a0a0; }
@@ -42,9 +42,34 @@
         .table.is-striped tbody tr:not(.is-selected):nth-child(even) { background-color: var(--dark-bg-1); }
 
         /* Main App Layout */
-        html { height: 100svh; overflow: hidden; }
-        body { display: flex; flex-direction: column; min-height: 100svh; padding-top: var(--bulma-navbar-height); }
-        .section { flex-grow: 1; display: flex; flex-direction: column; padding: 1rem; height: 1px; }
+        html { 
+            height: 100svh;
+            /* `overflow: hidden;` was removed to fix keyboard input on iOS */
+        }
+        body { 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100svh; 
+            /* Calculate body padding to account for navbar AND the safe area */
+            padding-top: calc(var(--bulma-navbar-height) + env(safe-area-inset-top));
+        }
+        
+        /* Add padding to the navbar itself to push its content down from the notch */
+        .navbar.is-fixed-top {
+            padding-top: env(safe-area-inset-top);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+
+        .section { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column; 
+            padding: 1rem; 
+            height: 1px;
+            /* Add padding at the bottom for the home indicator bar */
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+        }
         #appContainer { flex-grow: 1; display: flex; gap: 10px; flex-direction: column; }
         @media screen and (min-width: 769px) { #appContainer { flex-direction: row; } }
         #left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
@@ -57,7 +82,6 @@
 </head>
 <body>
 
-    <!-- FULL NAVBAR HTML - RESTORED -->
     <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
         <div class="navbar-brand">
             <a class="navbar-item has-text-weight-bold" id="qualityScreenButton">Quality Screen</a>
@@ -94,38 +118,21 @@
         </div></div>
     </nav>
 
-    <!-- Main content area -->
     <section class="section">
         <div id="appContainer">
-            <div id="left-panel">
-                <div id="priceChartContainer" class="chart-wrapper"><canvas id="priceChart"></canvas></div>
-                <div id="macdChartContainer" class="chart-wrapper"><canvas id="macdChart"></canvas></div>
-            </div>
-            <div id="right-panel">
-                <div id="portfolioChartContainer" class="chart-wrapper"><canvas id="portfolioChart"></canvas></div>
-                <div id="comparisonTableContainer" class="table-wrapper"></div>
-            </div>
+            <div id="left-panel"><div id="priceChartContainer" class="chart-wrapper"><canvas id="priceChart"></canvas></div><div id="macdChartContainer" class="chart-wrapper"><canvas id="macdChart"></canvas></div></div>
+            <div id="right-panel"><div id="portfolioChartContainer" class="chart-wrapper"><canvas id="portfolioChart"></canvas></div><div id="comparisonTableContainer" class="table-wrapper"></div></div>
         </div>
         <div id="statusMessage" class="has-text-centered mt-2" role="status" aria-live="polite"></div>
     </section>
     
-    <!-- FULL MODAL HTML - RESTORED -->
     <div class="modal" id="insightsModal">
         <div class="modal-background"></div>
-        <div class="modal-card">
-            <header class="modal-card-head">
-                <p class="modal-card-title">Analysis</p>
-                <button class="delete" aria-label="close"></button>
-            </header>
-            <section class="modal-card-body" id="insightsResult"></section>
-        </div>
+        <div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Analysis</p><button class="delete" aria-label="close"></button></header><section class="modal-card-body" id="insightsResult"></section></div>
     </div>
 
-    <!-- SCRIPT -->
     <script>
         (function() {
-            // --- ALL YOUR COMPLETE JAVASCRIPT CODE GOES HERE ---
-            // (It is assumed to be correct and complete from the previous steps)
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
             const LAST_TICKER_KEY = 'qualitystock_lastTicker';
             const tickerInput = document.getElementById('tickerInput'), fetchButton = document.getElementById('fetchButton');
