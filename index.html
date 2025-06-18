@@ -72,7 +72,7 @@
         .chart-wrapper { padding: 0; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* --- iOS KEYBOARD FIXES --- */
+        /* --- iOS KEYBOARD FIXES (Combined) --- */
         input, textarea, select {
             -webkit-user-select: text !important;
             user-select: text !important;
@@ -142,7 +142,6 @@
             let trendChannel = null, fairValue = null;
 
             // --- DOM ELEMENT REFERENCES ---
-            // It's good practice to declare all element references at the top.
             let tickerInput, fetchButton, fastEmaSlider, fastEmaValue, slowEmaSlider, slowEmaValue,
                 statusMessage, timePeriodSelector, priceChartContainer, priceCanvas, priceCtx,
                 macdChartContainer, macdCanvas, macdCtx, insightsButton, insightsModal, insightsResult,
@@ -150,7 +149,7 @@
 
             // --- PRIMARY EVENT LISTENER ---
             document.addEventListener('DOMContentLoaded', () => {
-                // Assign all DOM elements now that they are loaded
+                // Assign all DOM elements
                 tickerInput = document.getElementById('tickerInput');
                 fetchButton = document.getElementById('fetchButton');
                 fastEmaSlider = document.getElementById('fastEmaSlider');
@@ -174,7 +173,7 @@
                 discountRateInput = document.getElementById('discountRateInput');
                 terminalGrowthInput = document.getElementById('terminalGrowthInput');
 
-                // --- EVENT LISTENERS MOVED INSIDE DOMCONTENTLOADED ---
+                // Assign Event Listeners
                 fetchButton.addEventListener('click', fetchData);
                 tickerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fetchData(); });
                 discountRateInput.addEventListener('change', fetchData);
@@ -219,6 +218,17 @@
                         closeAllMenus();
                     }
                 });
+
+                // --- THE GLOBAL KEYBOARD FIX ---
+                // This listener on the entire window will catch the tap event before anything can stop it.
+                window.addEventListener('click', (event) => {
+                    const target = event.target;
+                    // Check if the tapped element is an input that should get focus
+                    if (target.matches('#tickerInput, #discountRateInput, #terminalGrowthInput')) {
+                        // Manually focus the element. This is the most reliable way to trigger the keyboard.
+                        target.focus();
+                    }
+                });
                 
                 // PWA & App Initialization
                 setupPWA();
@@ -227,7 +237,7 @@
                 fetchData();
             });
             
-            // --- ALL FUNCTIONS ---
+            // --- ALL OTHER FUNCTIONS ---
             function setupPWA() { if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered'), err => console.log('SW registration failed: ', err)); }); } }
             
             async function fetchData() {
@@ -285,10 +295,8 @@
 
             function processAndDraw() { if (allPrices.length === 0) return; const fastPeriod = parseInt(fastEmaSlider.value, 10), slowPeriod = parseInt(slowEmaSlider.value, 10); const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), sma50: calculateSMA(allPrices, 50), sma100: calculateSMA(allPrices, 100), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const startIndex = getFilterStartIndex(); dates = allDates.slice(startIndex); prices = allPrices.slice(startIndex); const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), sma50: full.sma50.slice(startIndex), sma100: full.sma100.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) }; if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data available for the selected time period."; return; } if (!statusMessage.textContent.includes('Fair Value')) { statusMessage.textContent = `Displaying ${tickerInput.value.trim().toUpperCase()}`; } drawPriceChart(sliced, fastPeriod, slowPeriod, signals, startIndex); drawMacdChart(sliced); }
             
-            // --- THE FIX IS HERE ---
             function findCrossoverSignals(fastEma, slowEma, macdLine, signalLine) {
                 const upArrowIndices = [], downArrowIndices = [];
-                // The loop now correctly uses the length of the passed-in array, not a global variable.
                 for (let i = 1; i < fastEma.length; i++) { 
                     if (fastEma[i] > slowEma[i]) {
                         if (macdLine[i-1] <= signalLine[i-1] && macdLine[i] > signalLine[i]) {
