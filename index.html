@@ -72,17 +72,25 @@
         .chart-wrapper { padding: 0; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* --- iOS KEYBOARD FIX --- */
-        /* This rule explicitly allows form inputs to be selected, which is required for the keyboard to appear on iOS.
-           It overrides any global `user-select: none` that might be set by a framework or reset stylesheet. */
+        /* --- iOS KEYBOARD FIXES --- */
+        /* Rule 1: Allow text selection on inputs, overriding any global 'user-select: none'. */
         input, textarea, select {
-            -webkit-user-select: text !important; /* iOS */
+            -webkit-user-select: text !important;
             user-select: text !important;
+        }
+        
+        /* Rule 2: The "Cursor Pointer" Hack. This often tricks iOS into recognizing the input as a valid tap target. */
+        input[type="text"], 
+        input[type="number"], 
+        textarea, 
+        select {
+            cursor: pointer;
         }
 
     </style>
 </head>
 <body>
+    <!-- The HTML and SCRIPT sections are identical to the last version. No changes needed there. -->
 
     <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
         <div class="navbar-brand">
@@ -135,6 +143,7 @@
 
     <script>
         (function() {
+            // ALL JAVASCRIPT CODE - This remains unchanged
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
             const LAST_TICKER_KEY = 'qualitystock_lastTicker';
             const tickerInput = document.getElementById('tickerInput'), fetchButton = document.getElementById('fetchButton');
