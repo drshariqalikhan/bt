@@ -2,19 +2,41 @@
 <html class="has-navbar-fixed-top is-dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Chart with Navbar</title>
-    <meta name="description" content="Quality Stock screener>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>QualityStock Screener</title>
+    <meta name="description" content="A quality stock screener and technical analysis tool.">
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
     <meta name="theme-color" content="#363636">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="QualityStock">
 
+    <!-- PWA Manifest (inlined to keep it a single file) -->
+    <link rel="manifest" href='data:application/manifest+json,{
+        "name": "QualityStock Screener",
+        "short_name": "QualityStock",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#1a1d21",
+        "theme_color": "#363636",
+        "description": "A quality stock screener and technical analysis tool.",
+        "icons": [
+            { "src": "images/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+            { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+        ]
+    }'>
+    
+    <!-- iOS Home Screen Icon -->
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+    
     <style>
         /* Dark Mode Theme */
         :root { --dark-bg-1: #1a1d21; --dark-bg-2: #272a2e; --dark-border: #444; --light-text: #f0f0f0; --dim-text: #a0a0a0; }
-        html, body { background-color: var(--dark-bg-1); color: var(--light-text); }
+        html { background-color: var(--dark-bg-1); }
+        body { background-color: var(--dark-bg-1); color: var(--light-text); }
         .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); }
         .navbar-item, .navbar-link { color: var(--light-text); }
         .navbar-link:not(.is-arrowless)::after { border-color: #3273dc; }
@@ -26,7 +48,6 @@
         .label, .has-text-weight-bold, .checkbox { color: var(--light-text); }
         .navbar-dropdown .label { color: #3298dc; }
         .navbar-item.clickable-button { cursor: pointer; }
-        /* MODIFIED: Make the navbar brand clickable */
         .navbar-brand .navbar-item.has-text-weight-bold { cursor: pointer; }
         .modal-card-body { color: #3298dc; }
         .modal-card-body a { color: #8ab4f8; }
@@ -35,10 +56,27 @@
         .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; }
         .table.is-striped tbody tr:not(.is-selected):nth-child(even) { background-color: var(--dark-bg-1); }
         
-        /* Main App Layout */
-        #appContainer { height: 80vh; display: flex; flex-direction: row; gap: 10px; }
-        #left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-        #right-panel { flex: 3; display: none; flex-direction: column; gap: 10px; }
+        /* --- REVISED Main App Layout --- */
+        html { height: 100svh; /* Use small viewport height for mobile */ }
+        body { display: flex; flex-direction: column; min-height: 100svh; padding-top: var(--bulma-navbar-height); /* Offset for fixed navbar */ }
+        .section { flex-grow: 1; display: flex; flex-direction: column; padding: 1rem; }
+
+        #appContainer {
+            flex-grow: 1; /* Make container fill the section */
+            display: flex;
+            gap: 10px;
+            flex-direction: column; /* Stack panels by default for mobile-first */
+        }
+        
+        /* Side-by-side layout for larger screens */
+        @media screen and (min-width: 769px) {
+            #appContainer {
+                flex-direction: row;
+            }
+        }
+        
+        #left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 300px; }
+        #right-panel { flex: 3; display: none; flex-direction: column; gap: 10px; min-height: 300px; }
         .chart-wrapper, .table-wrapper { background-color: var(--dark-bg-2); border-radius: 6px; position: relative; padding: 10px; }
         .chart-wrapper { padding: 0; }
         #priceChartContainer, #portfolioChartContainer { flex: 1; }
@@ -51,40 +89,32 @@
     <!-- Navbar -->
     <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
         <div class="navbar-brand">
-            <!-- MODIFIED: App title is now the Quality Screen button -->
             <a class="navbar-item has-text-weight-bold" id="qualityScreenButton">Quality Screen</a>
             <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicMenu"><span></span><span></span><span></span><span></span></a>
         </div>
         <div id="navbarBasicMenu" class="navbar-menu"><div class="navbar-start">
             <div class="navbar-item">
                 <div class="field is-grouped">
-                    <p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US" placeholder="e.g., AAPL.US"></p>
-                    <p class="control"><button id="fetchButton" class="button is-info">Fetch</button></p>
+                    <p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US" placeholder="e.g., AAPL.US" aria-label="Ticker Symbol Input"></p>
+                    <p class="control"><button id="fetchButton" class="button is-info" aria-label="Fetch stock data">Fetch</button></p>
                 </div>
             </div>
             <div class="navbar-item has-dropdown is-hoverable">
                 <a class="navbar-link">Settings</a>
                 <div class="navbar-dropdown">
-                    <div class="navbar-item"><div><label for="fastEmaSlider" class="label is-small">Fast EMA: <span id="fastEmaValue">10</span> weeks</label><input id="fastEmaSlider" class="slider is-fullwidth is-info" type="range" min="2" max="50" value="10"></div></div>
-                    <div class="navbar-item"><div><label for="slowEmaSlider" class="label is-small">Slow EMA: <span id="slowEmaValue">20</span> weeks</label><input id="slowEmaSlider" class="slider is-fullwidth is-success" type="range" min="5" max="100" value="20"></div></div>
+                    <div class="navbar-item"><div><label for="fastEmaSlider" class="label is-small">Fast EMA: <span id="fastEmaValue">10</span> weeks</label><input id="fastEmaSlider" class="slider is-fullwidth is-info" type="range" min="2" max="50" value="10" aria-label="Fast EMA period"></div></div>
+                    <div class="navbar-item"><div><label for="slowEmaSlider" class="label is-small">Slow EMA: <span id="slowEmaValue">20</span> weeks</label><input id="slowEmaSlider" class="slider is-fullwidth is-success" type="range" min="5" max="100" value="20" aria-label="Slow EMA period"></div></div>
                     <hr class="navbar-divider">
                     <div class="navbar-item"><div><label for="timePeriodSelector" class="label is-small">Time Period</label><div class="select is-fullwidth">
-                        <select id="timePeriodSelector">
-                            <option value="all">All Time</option>
-                            <option value="10yr">10 Years</option>
-                            <option value="7yr">7 Years</option>
-                            <option value="5yr" selected>5 Years</option>
-                            <option value="3yr">3 Years</option>
-                            <option value="1yr">1 Year</option>
-                            <option value="ytd">YTD</option>
-                            <option value="mtd">MTD</option>
+                        <select id="timePeriodSelector" aria-label="Chart Time Period">
+                            <option value="all">All Time</option><option value="10yr">10 Years</option><option value="7yr">7 Years</option><option value="5yr" selected>5 Years</option><option value="3yr">3 Years</option><option value="1yr">1 Year</option><option value="ytd">YTD</option><option value="mtd">MTD</option>
                         </select>
                     </div></div></div>
                     <hr class="navbar-divider">
                     <div class="navbar-item"><div><label class="label is-small">DCF Fair Value Calculation</label></div></div>
-                    <div class="navbar-item"><div><label for="discountRateInput" class="label is-small">Discount Rate (%)</label><input class="input is-small" type="number" id="discountRateInput" value="9.5"></div></div>
-                    <div class="navbar-item"><div><label for="terminalGrowthInput" class="label is-small">Terminal Growth Rate (%)</label><input class="input is-small" type="number" id="terminalGrowthInput" value="2.5"></div></div>
-                    <div class="navbar-item"><div class="field"><p class="control is-expanded"><input class="input is-small" type="number" id="fairValueInput" placeholder="Auto-calculated..." readonly></p></div></div>
+                    <div class="navbar-item"><div><label for="discountRateInput" class="label is-small">Discount Rate (%)</label><input class="input is-small" type="number" id="discountRateInput" value="9.5" aria-label="Discount Rate"></div></div>
+                    <div class="navbar-item"><div><label for="terminalGrowthInput" class="label is-small">Terminal Growth Rate (%)</label><input class="input is-small" type="number" id="terminalGrowthInput" value="2.5" aria-label="Terminal Growth Rate"></div></div>
+                    <div class="navbar-item"><div class="field"><p class="control is-expanded"><input class="input is-small" type="number" id="fairValueInput" placeholder="Auto-calculated..." readonly aria-label="Calculated Fair Value"></p></div></div>
                     <hr class="navbar-divider">
                     <a class="navbar-item clickable-button" id="insightsButton">Analyze Insights</a>
                     <a class="navbar-item clickable-button" id="channelButton">Draw Trend Channel</a>
@@ -94,11 +124,17 @@
     </nav>
 
     <!-- Main content area and Modal -->
-    <section class="section"><div class="container"><div id="appContainer" class="mt-4"><div id="left-panel"><div id="priceChartContainer" class="chart-wrapper"><canvas id="priceChart"></canvas></div><div id="macdChartContainer" class="chart-wrapper"><canvas id="macdChart"></canvas></div></div><div id="right-panel"><div id="portfolioChartContainer" class="chart-wrapper"><canvas id="portfolioChart"></canvas></div><div id="comparisonTableContainer" class="table-wrapper"></div></div></div><div id="statusMessage" class="has-text-centered mt-2"></div></div></section>
+    <section class="section"><div class="container is-fluid"><div id="appContainer"><div id="left-panel"><div id="priceChartContainer" class="chart-wrapper"><canvas id="priceChart"></canvas></div><div id="macdChartContainer" class="chart-wrapper"><canvas id="macdChart"></canvas></div></div><div id="right-panel"><div id="portfolioChartContainer" class="chart-wrapper"><canvas id="portfolioChart"></canvas></div><div id="comparisonTableContainer" class="table-wrapper"></div></div></div><div id="statusMessage" class="has-text-centered mt-2" role="status" aria-live="polite"></div></div></section>
     <div class="modal" id="insightsModal"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Analysis</p><button class="delete" aria-label="close"></button></header><section class="modal-card-body" id="insightsResult"></section></div></div>
 
     <script>
-        // --- DOM Elements & Data Storage ---
+    // --- IIFE to encapsulate code and avoid global scope pollution ---
+    (function() {
+        // --- Constants & State ---
+        const CORS_PROXY = "https://api.allorigins.win/raw?url="; // WARNING: Free, public proxy. Not reliable for production.
+        const LAST_TICKER_KEY = 'qualitystock_lastTicker';
+
+        // --- DOM Elements ---
         const tickerInput = document.getElementById('tickerInput'), fetchButton = document.getElementById('fetchButton');
         const fastEmaSlider = document.getElementById('fastEmaSlider'), fastEmaValue = document.getElementById('fastEmaValue');
         const slowEmaSlider = document.getElementById('slowEmaSlider'), slowEmaValue = document.getElementById('slowEmaValue');
@@ -111,12 +147,64 @@
         const fairValueInput = document.getElementById('fairValueInput');
         const discountRateInput = document.getElementById('discountRateInput');
         const terminalGrowthInput = document.getElementById('terminalGrowthInput');
+
+        // --- Data Storage ---
         let allDates = [], allPrices = [], dates = [], prices = [];
         let trendChannel = null, fairValue = null;
-        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
 
+        // --- PWA Setup ---
+        function setupPWA() {
+            if ('serviceWorker' in navigator) {
+                // The service worker code is defined as a string
+                const swCode = `
+                    const CACHE_NAME = 'qualitystock-v2';
+                    // The app shell consists of the main HTML file and the Bulma CSS
+                    const urlsToCache = [
+                        '/',
+                        '/index.html',
+                        'https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css'
+                    ];
+
+                    self.addEventListener('install', event => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME)
+                                .then(cache => {
+                                    console.log('Service Worker: Caching app shell');
+                                    return cache.addAll(urlsToCache);
+                                })
+                        );
+                    });
+
+                    self.addEventListener('fetch', event => {
+                        // We only handle GET requests
+                        if (event.request.method !== 'GET') return;
+                        
+                        event.respondWith(
+                            caches.match(event.request)
+                                .then(response => {
+                                    // Cache hit - return response
+                                    if (response) {
+                                        return response;
+                                    }
+                                    // Not in cache - fetch from network
+                                    return fetch(event.request);
+                                })
+                        );
+                    });
+                `;
+                // Create a Blob from the string and register it
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+
+                navigator.serviceWorker.register(swUrl)
+                    .then(registration => console.log('ServiceWorker registration successful with scope: ', registration.scope))
+                    .catch(err => console.log('ServiceWorker registration failed: ', err));
+            }
+        }
+        
         // --- Event Listeners ---
         fetchButton.addEventListener('click', fetchData);
+        tickerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fetchData(); });
         discountRateInput.addEventListener('change', fetchData);
         terminalGrowthInput.addEventListener('change', fetchData);
         timePeriodSelector.addEventListener('change', () => { trendChannel = null; processAndDraw(); });
@@ -124,12 +212,27 @@
         slowEmaSlider.addEventListener('change', processAndDraw);
         fastEmaSlider.addEventListener('input', () => fastEmaValue.textContent = `${fastEmaSlider.value} weeks`);
         slowEmaSlider.addEventListener('input', () => slowEmaValue.textContent = `${slowEmaSlider.value} weeks`);
-        document.addEventListener('DOMContentLoaded', () => { const burger = document.querySelector('.navbar-burger'); burger.addEventListener('click', () => burger.classList.toggle('is-active') && document.getElementById(burger.dataset.target).classList.toggle('is-active')); fetchData(); });
         insightsButton.addEventListener('click', calculateAndShowInsights);
         qualityScreenButton.addEventListener('click', fetchQualityHoldings);
         insightsModal.querySelector('.modal-background').addEventListener('click', () => insightsModal.classList.remove('is-active'));
         insightsModal.querySelector('.delete').addEventListener('click', () => insightsModal.classList.remove('is-active'));
         channelButton.addEventListener('click', () => { trendChannel = calculateTrendChannel(prices); processAndDraw(); });
+        document.addEventListener('DOMContentLoaded', () => {
+            const burger = document.querySelector('.navbar-burger');
+            burger.addEventListener('click', () => {
+                burger.classList.toggle('is-active');
+                document.getElementById(burger.dataset.target).classList.toggle('is-active');
+            });
+
+            // PWA & App Initialization
+            setupPWA();
+            const lastTicker = localStorage.getItem(LAST_TICKER_KEY);
+            if (lastTicker) {
+                tickerInput.value = lastTicker;
+            }
+            fetchData();
+        });
+
 
         // --- Core Functions ---
         async function fetchData() {
@@ -139,6 +242,7 @@
             statusMessage.textContent = `Fetching price data for ${ticker}...`;
             clearCharts();
             try {
+                // WARNING: Scraping is brittle and may break if Stooq changes its format.
                 const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`;
                 const proxyUrl = `${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;
                 const response = await fetch(proxyUrl);
@@ -152,6 +256,8 @@
                 allDates = [], allPrices = [];
                 lines.forEach(line => { const columns = line.split(delimiter); if (columns.length > Math.max(dateIndex, closeIndex)) { const dateStr = columns[dateIndex], closePrice = parseFloat(columns[closeIndex]); if (dateStr && !isNaN(closePrice)) { allDates.push(dateStr); allPrices.push(closePrice); } } });
                 if (allPrices.length === 0) throw new Error("No valid price data rows found.");
+                
+                localStorage.setItem(LAST_TICKER_KEY, ticker); // Save successful ticker
                 await fetchAndCalculateFairValue();
                 timePeriodSelector.value = '5yr';
                 processAndDraw();
@@ -162,6 +268,7 @@
             const ticker = tickerInput.value.trim().toUpperCase().split('.')[0];
             if (!ticker) return;
             statusMessage.textContent = `Fetching fundamental data for ${ticker}...`;
+            // WARNING: Scraping Finviz is extremely unreliable and may be blocked or changed without notice.
             const targetUrl = `https://finviz.com/quote.ashx?t=${ticker}`;
             const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
             try {
@@ -206,6 +313,7 @@
         function drawArrow(ctx, x, y, direction, size, color) { ctx.beginPath(); ctx.fillStyle = color; if (direction === 'up') { ctx.moveTo(x, y); ctx.lineTo(x - size, y + size); ctx.lineTo(x + size, y + size); } else { ctx.moveTo(x, y); ctx.lineTo(x - size, y - size); ctx.lineTo(x + size, y - size); } ctx.closePath(); ctx.fill(); }
         function drawPriceChart(slicedData, fastPeriod, slowPeriod, signals, startIndex) { const { fastEma, slowEma, sma50, sma100 } = slicedData; const w = priceChartContainer.clientWidth, h = priceChartContainer.clientHeight; if (w <= 0 || h <= 0) return; priceCanvas.width = w * devicePixelRatio; priceCanvas.height = h * devicePixelRatio; priceCtx.scale(devicePixelRatio, devicePixelRatio); priceCtx.clearRect(0, 0, w, h); let allData = [...prices, ...fastEma.filter(v=>v), ...slowEma.filter(v=>v), ...sma50.filter(v=>v), ...sma100.filter(v=>v)]; if (fairValue !== null) { allData.push(fairValue); } if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; priceCtx.font = "12px sans-serif"; priceCtx.textAlign = 'right'; priceCtx.fillStyle = '#a0a0a0'; for (let i = 0; i <= 5; i++) { const val = minY + (i / 5) * (maxY - minY); const y = mapY(val); priceCtx.beginPath(); priceCtx.strokeStyle = '#444'; priceCtx.lineWidth = 0.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(margin.left + chartW, y); priceCtx.stroke(); priceCtx.fillText(val.toFixed(2), margin.left - 8, y + 4); } const xTickStep = Math.max(1, Math.floor(prices.length / Math.floor(chartW / 100))); for (let i = 0; i < prices.length; i += xTickStep) { priceCtx.textAlign = 'center'; priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20); } drawLine(priceCtx, prices, mapX, mapY, '#a0a0a0', 1.5); drawLine(priceCtx, fastEma, mapX, mapY, '#3273dc'); drawLine(priceCtx, slowEma, mapX, mapY, '#23d160'); drawLine(priceCtx, sma50, mapX, mapY, '#ff9800'); drawLine(priceCtx, sma100, mapX, mapY, '#c56bf0'); if (trendChannel) { priceCtx.beginPath(); priceCtx.setLineDash([5, 5]); priceCtx.strokeStyle = 'rgba(50, 152, 220, 0.7)'; priceCtx.lineWidth = 1; const y1_upper = mapY(trendChannel.slope * 0 + trendChannel.upperIntercept); const y2_upper = mapY(trendChannel.slope * (prices.length - 1) + trendChannel.upperIntercept); priceCtx.moveTo(mapX(0), y1_upper); priceCtx.lineTo(mapX(prices.length - 1), y2_upper); const y1_lower = mapY(trendChannel.slope * 0 + trendChannel.lowerIntercept); const y2_lower = mapY(trendChannel.slope * (prices.length - 1) + trendChannel.lowerIntercept); priceCtx.moveTo(mapX(0), y1_lower); priceCtx.lineTo(mapX(prices.length - 1), y2_lower); priceCtx.stroke(); priceCtx.setLineDash([]); } if (fairValue !== null && fairValue >= minY && fairValue <= maxY) { const y = mapY(fairValue); priceCtx.beginPath(); priceCtx.setLineDash([4, 4]); priceCtx.strokeStyle = '#ffd700'; priceCtx.lineWidth = 1.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(w - margin.right, y); priceCtx.stroke(); priceCtx.setLineDash([]); priceCtx.font = "12px sans-serif"; priceCtx.fillStyle = '#ffd700'; priceCtx.textAlign = 'left'; priceCtx.fillText('Fair Value', w - margin.right + 5, y + 4); } const arrowSize = 5, arrowOffset = 15; signals.upArrowIndices.forEach(fullIndex => { if (fullIndex >= startIndex) { const localIndex = fullIndex - startIndex; if (prices[localIndex]) { const x = mapX(localIndex); const y = mapY(prices[localIndex]) + arrowOffset; drawArrow(priceCtx, x, y, 'up', arrowSize, 'rgba(35, 209, 96, 0.9)'); } } }); signals.downArrowIndices.forEach(fullIndex => { if (fullIndex >= startIndex) { const localIndex = fullIndex - startIndex; if (prices[localIndex]) { const x = mapX(localIndex); const y = mapY(prices[localIndex]) - arrowOffset; drawArrow(priceCtx, x, y, 'down', arrowSize, 'rgba(255, 56, 96, 0.9)'); } } }); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; priceCtx.font = "14px sans-serif"; priceCtx.fillStyle = '#a0a0a0'; priceCtx.fillText('Price', legX, legY); priceCtx.fillStyle = '#3273dc'; priceCtx.fillText(`Fast EMA (${fastPeriod})`, legX, legY + sp); priceCtx.fillStyle = '#23d160'; priceCtx.fillText(`Slow EMA (${slowPeriod})`, legX, legY + sp * 2); priceCtx.fillStyle = '#ff9800'; priceCtx.fillText('50-week SMA', legX, legY + sp * 3); priceCtx.fillStyle = '#c56bf0'; priceCtx.fillText('100-week SMA', legX, legY + sp * 4); }
         function drawMacdChart(slicedData) { const { macdLine, signalLine, histogram } = slicedData; const w = macdChartContainer.clientWidth, h = macdChartContainer.clientHeight; if (w <= 0 || h <= 0) return; macdCanvas.width = w * devicePixelRatio; macdCanvas.height = h * devicePixelRatio; macdCtx.scale(devicePixelRatio, devicePixelRatio); macdCtx.clearRect(0, 0, w, h); const allData = [...macdLine.filter(v=>v), ...signalLine.filter(v=>v), ...histogram.filter(v=>v)]; if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; const yZero = mapY(0); macdCtx.beginPath(); macdCtx.strokeStyle = '#a0a0a0'; macdCtx.lineWidth = 1; macdCtx.moveTo(margin.left, yZero); macdCtx.lineTo(margin.left + chartW, yZero); macdCtx.stroke(); const barW = Math.max(1, chartW / prices.length * 0.8); for(let i = 0; i < histogram.length; i++) { if(histogram[i] !== null) { const x = mapX(i) - barW / 2, y = mapY(histogram[i]); macdCtx.fillStyle = histogram[i] > 0 ? 'rgba(35, 209, 96, 0.7)' : 'rgba(255, 56, 96, 0.7)'; macdCtx.fillRect(x, y, barW, yZero - y); } } drawLine(macdCtx, macdLine, mapX, mapY, '#007bff'); drawLine(macdCtx, signalLine, mapX, mapY, '#fd7e14'); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; macdCtx.font = "14px sans-serif"; macdCtx.fillStyle = '#007bff'; macdCtx.fillText('MACD Line', legX, legY); macdCtx.fillStyle = '#fd7e14'; macdCtx.fillText('Signal Line', legX, legY + sp); }
+    })();
     </script>
 </body>
 </html>
