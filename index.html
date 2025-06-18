@@ -20,6 +20,8 @@
         .label, .has-text-weight-bold, .checkbox { color: var(--light-text); }
         .navbar-dropdown .label { color: #3298dc; }
         .navbar-item.clickable-button { cursor: pointer; }
+        /* MODIFIED: Make the navbar brand clickable */
+        .navbar-brand .navbar-item.has-text-weight-bold { cursor: pointer; }
         .modal-card-body { color: #3298dc; }
         .modal-card-body a { color: #8ab4f8; }
         .modal-card-body a:hover { color: #c8d9f5; }
@@ -29,7 +31,7 @@
         
         /* Main App Layout */
         #appContainer { height: 80vh; display: flex; flex-direction: row; gap: 10px; }
-        #left-panel { flex: 7; display: flex; flex-direction: column; gap: 10px; }
+        #left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
         #right-panel { flex: 3; display: none; flex-direction: column; gap: 10px; }
         .chart-wrapper, .table-wrapper { background-color: var(--dark-bg-2); border-radius: 6px; position: relative; padding: 10px; }
         .chart-wrapper { padding: 0; }
@@ -42,7 +44,11 @@
 
     <!-- Navbar -->
     <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
-        <div class="navbar-brand"><a class="navbar-item has-text-weight-bold">Stock Viewer</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicMenu"><span></span><span></span><span></span><span></span></a></div>
+        <div class="navbar-brand">
+            <!-- MODIFIED: App title is now the Quality Screen button -->
+            <a class="navbar-item has-text-weight-bold" id="qualityScreenButton">Quality Screen</a>
+            <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicMenu"><span></span><span></span><span></span><span></span></a>
+        </div>
         <div id="navbarBasicMenu" class="navbar-menu"><div class="navbar-start">
             <div class="navbar-item">
                 <div class="field is-grouped">
@@ -77,10 +83,6 @@
                     <a class="navbar-item clickable-button" id="insightsButton">Analyze Insights</a>
                     <a class="navbar-item clickable-button" id="channelButton">Draw Trend Channel</a>
                 </div>
-            </div>
-            <!-- MODIFIED: Quality Screen button is a primary navbar item -->
-            <div class="navbar-item">
-                <button class="button is-link" id="qualityScreenButton">Quality Screen</button>
             </div>
         </div></div>
     </nav>
@@ -144,9 +146,7 @@
                 allDates = [], allPrices = [];
                 lines.forEach(line => { const columns = line.split(delimiter); if (columns.length > Math.max(dateIndex, closeIndex)) { const dateStr = columns[dateIndex], closePrice = parseFloat(columns[closeIndex]); if (dateStr && !isNaN(closePrice)) { allDates.push(dateStr); allPrices.push(closePrice); } } });
                 if (allPrices.length === 0) throw new Error("No valid price data rows found.");
-                
                 await fetchAndCalculateFairValue();
-                
                 timePeriodSelector.value = '5yr';
                 processAndDraw();
             } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error:", error); }
