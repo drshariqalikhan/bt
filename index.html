@@ -95,7 +95,6 @@
                         <p class="control"><button id="fetchButton" class="button is-info" aria-label="Fetch stock data">Fetch</button></p>
                     </div>
                 </div>
-                <!-- THE FIX: `is-hoverable` class is REMOVED. ID is added for JS targeting. -->
                 <div class="navbar-item has-dropdown" id="settingsDropdown">
                     <a class="navbar-link">Settings</a>
                     <div class="navbar-dropdown">
@@ -136,64 +135,76 @@
 
     <script>
         (function() {
-            // All JS variables...
+            // --- CONSTANTS AND STATE ---
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
             const LAST_TICKER_KEY = 'qualitystock_lastTicker';
-            const tickerInput = document.getElementById('tickerInput'), fetchButton = document.getElementById('fetchButton');
-            const fastEmaSlider = document.getElementById('fastEmaSlider'), fastEmaValue = document.getElementById('fastEmaValue');
-            const slowEmaSlider = document.getElementById('slowEmaSlider'), slowEmaValue = document.getElementById('slowEmaValue');
-            const statusMessage = document.getElementById('statusMessage'), timePeriodSelector = document.getElementById('timePeriodSelector');
-            const priceChartContainer = document.getElementById('priceChartContainer'), priceCanvas = document.getElementById('priceChart'), priceCtx = priceCanvas.getContext('2d');
-            const macdChartContainer = document.getElementById('macdChartContainer'), macdCanvas = document.getElementById('macdChart'), macdCtx = macdCanvas.getContext('2d');
-            const insightsButton = document.getElementById('insightsButton'), insightsModal = document.getElementById('insightsModal'), insightsResult = document.getElementById('insightsResult');
-            const channelButton = document.getElementById('channelButton');
-            const qualityScreenButton = document.getElementById('qualityScreenButton');
-            const fairValueInput = document.getElementById('fairValueInput');
-            const discountRateInput = document.getElementById('discountRateInput');
-            const terminalGrowthInput = document.getElementById('terminalGrowthInput');
             let allDates = [], allPrices = [], dates = [], prices = [];
             let trendChannel = null, fairValue = null;
 
-            // All event listeners...
-            fetchButton.addEventListener('click', fetchData);
-            tickerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fetchData(); });
-            discountRateInput.addEventListener('change', fetchData);
-            terminalGrowthInput.addEventListener('change', fetchData);
-            timePeriodSelector.addEventListener('change', () => { trendChannel = null; processAndDraw(); });
-            fastEmaSlider.addEventListener('change', processAndDraw);
-            slowEmaSlider.addEventListener('change', processAndDraw);
-            fastEmaSlider.addEventListener('input', () => fastEmaValue.textContent = `${fastEmaSlider.value} weeks`);
-            slowEmaSlider.addEventListener('input', () => slowEmaValue.textContent = `${slowEmaSlider.value} weeks`);
-            insightsButton.addEventListener('click', calculateAndShowInsights);
-            qualityScreenButton.addEventListener('click', fetchQualityHoldings);
-            insightsModal.querySelector('.modal-background').addEventListener('click', () => insightsModal.classList.remove('is-active'));
-            insightsModal.querySelector('.delete').addEventListener('click', () => insightsModal.classList.remove('is-active'));
-            channelButton.addEventListener('click', () => { trendChannel = calculateTrendChannel(prices); processAndDraw(); });
+            // --- DOM ELEMENT REFERENCES ---
+            // It's good practice to declare all element references at the top.
+            let tickerInput, fetchButton, fastEmaSlider, fastEmaValue, slowEmaSlider, slowEmaValue,
+                statusMessage, timePeriodSelector, priceChartContainer, priceCanvas, priceCtx,
+                macdChartContainer, macdCanvas, macdCtx, insightsButton, insightsModal, insightsResult,
+                channelButton, qualityScreenButton, fairValueInput, discountRateInput, terminalGrowthInput;
 
+            // --- PRIMARY EVENT LISTENER ---
             document.addEventListener('DOMContentLoaded', () => {
-                // --- SETUP FOR ALL DROPDOWNS & BURGERS (ROBUST METHOD) ---
+                // Assign all DOM elements now that they are loaded
+                tickerInput = document.getElementById('tickerInput');
+                fetchButton = document.getElementById('fetchButton');
+                fastEmaSlider = document.getElementById('fastEmaSlider');
+                fastEmaValue = document.getElementById('fastEmaValue');
+                slowEmaSlider = document.getElementById('slowEmaSlider');
+                slowEmaValue = document.getElementById('slowEmaValue');
+                statusMessage = document.getElementById('statusMessage');
+                timePeriodSelector = document.getElementById('timePeriodSelector');
+                priceChartContainer = document.getElementById('priceChartContainer');
+                priceCanvas = document.getElementById('priceChart');
+                priceCtx = priceCanvas.getContext('2d');
+                macdChartContainer = document.getElementById('macdChartContainer');
+                macdCanvas = document.getElementById('macdChart');
+                macdCtx = macdCanvas.getContext('2d');
+                insightsButton = document.getElementById('insightsButton');
+                insightsModal = document.getElementById('insightsModal');
+                insightsResult = document.getElementById('insightsResult');
+                channelButton = document.getElementById('channelButton');
+                qualityScreenButton = document.getElementById('qualityScreenButton');
+                fairValueInput = document.getElementById('fairValueInput');
+                discountRateInput = document.getElementById('discountRateInput');
+                terminalGrowthInput = document.getElementById('terminalGrowthInput');
+
+                // --- EVENT LISTENERS MOVED INSIDE DOMCONTENTLOADED ---
+                fetchButton.addEventListener('click', fetchData);
+                tickerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fetchData(); });
+                discountRateInput.addEventListener('change', fetchData);
+                terminalGrowthInput.addEventListener('change', fetchData);
+                timePeriodSelector.addEventListener('change', () => { trendChannel = null; processAndDraw(); });
+                fastEmaSlider.addEventListener('change', processAndDraw);
+                slowEmaSlider.addEventListener('change', processAndDraw);
+                fastEmaSlider.addEventListener('input', () => fastEmaValue.textContent = `${fastEmaSlider.value} weeks`);
+                slowEmaSlider.addEventListener('input', () => slowEmaValue.textContent = `${slowEmaSlider.value} weeks`);
+                insightsButton.addEventListener('click', calculateAndShowInsights);
+                qualityScreenButton.addEventListener('click', fetchQualityHoldings);
+                insightsModal.querySelector('.modal-background').addEventListener('click', () => insightsModal.classList.remove('is-active'));
+                insightsModal.querySelector('.delete').addEventListener('click', () => insightsModal.classList.remove('is-active'));
+                channelButton.addEventListener('click', () => { trendChannel = calculateTrendChannel(prices); processAndDraw(); });
+                
+                // Dropdown and Burger Menu Logic
                 const settingsDropdown = document.getElementById('settingsDropdown');
                 const burger = document.querySelector('.navbar-burger');
                 const menu = document.getElementById(burger.dataset.target);
-
-                // Function to close all active dropdowns/menus
                 const closeAllMenus = () => {
                     settingsDropdown.classList.remove('is-active');
                     burger.classList.remove('is-active');
                     menu.classList.remove('is-active');
                 };
-
-                // Toggle for settings dropdown
                 settingsDropdown.addEventListener('click', (event) => {
-                    event.stopPropagation(); // Prevent click from bubbling to document
+                    event.stopPropagation();
                     const isActive = settingsDropdown.classList.contains('is-active');
-                    closeAllMenus(); // Close others first
-                    if (!isActive) {
-                        settingsDropdown.classList.add('is-active');
-                    }
+                    closeAllMenus();
+                    if (!isActive) settingsDropdown.classList.add('is-active');
                 });
-
-                // Toggle for mobile burger menu
                 burger.addEventListener('click', (event) => {
                     event.stopPropagation();
                     const isActive = burger.classList.contains('is-active');
@@ -203,24 +214,22 @@
                         menu.classList.add('is-active');
                     }
                 });
-
-                // Global listener to close menus when clicking outside
                 document.addEventListener('click', (event) => {
                     if (!settingsDropdown.contains(event.target) && !burger.contains(event.target)) {
                         closeAllMenus();
                     }
                 });
                 
-                // --- PWA & App Initialization ---
+                // PWA & App Initialization
                 setupPWA();
                 const lastTicker = localStorage.getItem(LAST_TICKER_KEY);
                 if (lastTicker) { tickerInput.value = lastTicker; }
                 fetchData();
             });
             
-            // --- ALL OTHER FUNCTIONS (fetchData, drawChart, etc.) ---
-            // These functions remain unchanged from the previous correct version.
+            // --- ALL FUNCTIONS ---
             function setupPWA() { if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered'), err => console.log('SW registration failed: ', err)); }); } }
+            
             async function fetchData() {
                 trendChannel = null; fairValue = null; fairValueInput.value = '';
                 const ticker = tickerInput.value.trim().toUpperCase();
@@ -247,6 +256,7 @@
                     processAndDraw();
                 } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error:", error); }
             }
+            
             async function fetchAndCalculateFairValue() {
                 const ticker = tickerInput.value.trim().toUpperCase().split('.')[0];
                 if (!ticker) return;
@@ -272,12 +282,30 @@
                     statusMessage.textContent = `Successfully calculated Fair Value of ${ticker}: $${fairValue.toFixed(2)}`;
                 } catch (error) { console.error(`Fair Value Calculation Error: ${error.message}`); statusMessage.textContent = `Could not calculate Fair Value. ${error.message}`; fairValue = null; fairValueInput.value = ''; }
             }
+
             function processAndDraw() { if (allPrices.length === 0) return; const fastPeriod = parseInt(fastEmaSlider.value, 10), slowPeriod = parseInt(slowEmaSlider.value, 10); const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), sma50: calculateSMA(allPrices, 50), sma100: calculateSMA(allPrices, 100), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const startIndex = getFilterStartIndex(); dates = allDates.slice(startIndex); prices = allPrices.slice(startIndex); const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), sma50: full.sma50.slice(startIndex), sma100: full.sma100.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) }; if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data available for the selected time period."; return; } if (!statusMessage.textContent.includes('Fair Value')) { statusMessage.textContent = `Displaying ${tickerInput.value.trim().toUpperCase()}`; } drawPriceChart(sliced, fastPeriod, slowPeriod, signals, startIndex); drawMacdChart(sliced); }
+            
+            // --- THE FIX IS HERE ---
+            function findCrossoverSignals(fastEma, slowEma, macdLine, signalLine) {
+                const upArrowIndices = [], downArrowIndices = [];
+                // The loop now correctly uses the length of the passed-in array, not a global variable.
+                for (let i = 1; i < fastEma.length; i++) { 
+                    if (fastEma[i] > slowEma[i]) {
+                        if (macdLine[i-1] <= signalLine[i-1] && macdLine[i] > signalLine[i]) {
+                            upArrowIndices.push(i);
+                        }
+                        if (macdLine[i-1] >= signalLine[i-1] && macdLine[i] < signalLine[i]) {
+                            downArrowIndices.push(i);
+                        }
+                    }
+                }
+                return { upArrowIndices, downArrowIndices };
+            }
+
             async function fetchQualityHoldings() { insightsModal.querySelector('.modal-card-title').textContent = 'Fetching Data...'; insightsResult.innerHTML = `<p>Fetching top holdings from iShares IWQU...</p>`; insightsModal.classList.add('is-active'); const url = 'https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund'; const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`; try { const response = await fetch(proxyUrl); if (!response.ok) throw new Error(`Network Error fetching holdings: ${response.statusText}`); const csvData = await response.text(); const lines = csvData.trim().split('\n'); const dataStartIndex = lines.findIndex(line => line.trim().startsWith('Ticker,')); if (dataStartIndex === -1) throw new Error("Could not find holdings data header in CSV."); const holdingsData = lines.slice(dataStartIndex + 1, dataStartIndex + 21); const top20 = holdingsData.map(line => { const columns = line.split(','); const baseTicker = columns[0]?.replace(/"/g, '').split(' ')[0] || null; const name = columns[1]?.replace(/"/g, '') || 'N/A'; return { baseTicker, name }; }).filter(h => h.baseTicker); displayQualityHoldings(top20); } catch (error) { insightsResult.innerHTML = `<p class="has-text-danger">Error fetching quality holdings: ${error.message}</p>`; } }
             function displayQualityHoldings(holdings) { insightsModal.querySelector('.modal-card-title').textContent = 'Top 20 Quality Holdings (IWQU)'; let html = '<p>Click a ticker to load its chart:</p><ul class="mt-4">'; holdings.forEach(holding => { const stooqTicker = `${holding.baseTicker}.US`; html += `<li><a href="#" data-ticker="${stooqTicker}">${holding.baseTicker} - ${holding.name}</a></li>`; }); html += '</ul>'; insightsResult.innerHTML = html; insightsResult.querySelectorAll('a').forEach(link => { link.addEventListener('click', (event) => { event.preventDefault(); tickerInput.value = event.target.dataset.ticker; insightsModal.classList.remove('is-active'); fetchData(); }); }); }
             function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { let pvSum = 0; let currentEps = eps; for (let i = 1; i <= 5; i++) { currentEps *= (1 + growthRate5Y); pvSum += currentEps / Math.pow(1 + discountRate, i); } const terminalEps = currentEps * (1 + terminalGrowthRate); const terminalValue = terminalEps / (discountRate - terminalGrowthRate); const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5); return pvSum + pvTerminalValue; }
-            function calculateAndShowInsights() { if (allPrices.length < 5) { insightsResult.innerHTML = `<p>Not enough historical data.</p>`; insightsModal.classList.add('is-active'); return; } insightsModal.querySelector('.modal-card-title').textContent = 'Trend Analysis'; const fastPeriod = parseInt(fastEmaSlider.value, 10), slowPeriod = parseInt(slowEmaSlider.value, 10); const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) }; const { upArrowIndices, downArrowIndices } = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const maxRises = [], maxFalls = []; let fallExceedsRiseCount = 0; downArrowIndices.forEach(downIndex => { const nextUpIndex = upArrowIndices.find(upIndex => upIndex > downIndex); if (nextUpIndex && downIndex > 0) { const anchorPrice = allPrices[downIndex - 1]; const periodPrices = allPrices.slice(downIndex, nextUpIndex + 1); if (periodPrices.length > 0 && anchorPrice > 0) { const risePercent = ((Math.max(...periodPrices) - anchorPrice) / anchorPrice) * 100; const fallPercent = ((Math.min(...periodPrices) - anchorPrice) / anchorPrice) * 100; maxRises.push(risePercent); maxFalls.push(fallPercent); if (Math.abs(fallPercent) > risePercent) fallExceedsRiseCount++; } } }); let triggerCount = 0, outcomeCount = 0; for (let i = 1; i < allPrices.length - 4; i++) { const isDownArrow = (full.fastEma[i] > full.slowEma[i]) && (full.macdLine[i-1] >= full.signalLine[i-1]) && (full.macdLine[i] < full.signalLine[i]); if (isDownArrow) { const hist1 = full.histogram[i+1], hist2 = full.histogram[i+2], hist3 = full.histogram[i+3]; const isStrengtheningDownwardMomentum = (hist1 < 0 && hist2 < 0 && hist3 < 0) && (hist2 < hist1) && (hist3 < hist2); if (isStrengtheningDownwardMomentum) { triggerCount++; for (let j = i + 4; j < allPrices.length; j++) { if (full.fastEma[j-1] >= full.slowEma[j-1] && full.fastEma[j] < full.slowEma[j]) { outcomeCount++; break; } } } } } let htmlResult = `<p>Based on the current settings (Fast EMA: ${fastPeriod}, Slow EMA: ${slowPeriod}):</p><hr>`; if (maxRises.length > 0) { const avgMaxRise = maxRises.reduce((a, b) => a + b, 0) / maxRises.length; const avgMaxFall = maxFalls.reduce((a, b) => a + b, 0) / maxFalls.length; const likelihood = (fallExceedsRiseCount / maxRises.length) * 100; htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong></p><ul><li><strong>Periods found:</strong> ${maxRises.length}</li><li><strong>Avg Max Rise %:</strong> <span style="color: #23d160;">${avgMaxRise.toFixed(2)}%</span></li><li><strong>Avg Max Fall %:</strong> <span style="color: #ff3860;">${avgMaxFall.toFixed(2)}%</span></li><li style="margin-top: 8px;"><strong>Likelihood of fall > rise:</strong> ${likelihood.toFixed(1)}%</li></ul>`; } else { htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong> No valid periods found.</p>`; } htmlResult += `<hr>`; if (triggerCount > 0) { const probability = (outcomeCount / triggerCount) * 100; htmlResult += `<p><strong>Bearish Momentum Analysis:</strong></p><ul><li><strong>Signals found:</strong> ${triggerCount}</li><li><strong>Probability of subsequent EMA cross:</strong> ${probability.toFixed(1)}%</li></ul><p class="is-size-7" style="color: var(--dim-text);"><em>A "signal" is a down-arrow followed by 3 successively <strong>more negative</strong> red MACD bars. The probability measures how often a bearish EMA cross occurred after such a signal.</em></p>`; } else { htmlResult += `<p><strong>Bearish Momentum Analysis:</strong> No signals found with the current settings.</p>`; } insightsResult.innerHTML = htmlResult; insightsModal.classList.add('is-active'); }
-            function findCrossoverSignals(fastEma, slowEma, macdLine, signalLine) { const upArrowIndices = [], downArrowIndices = []; for (let i = 1; i < allPrices.length; i++) { if (fastEma[i] > slowEma[i]) { if (macdLine[i-1] <= signalLine[i-1] && macdLine[i] > signalLine[i]) { upArrowIndices.push(i); } if (macdLine[i-1] >= signalLine[i-1] && macdLine[i] < full.signalLine[i]) { downArrowIndices.push(i); } } } return { upArrowIndices, downArrowIndices }; }
+            function calculateAndShowInsights() { if (allPrices.length < 5) { insightsResult.innerHTML = `<p>Not enough historical data.</p>`; insightsModal.classList.add('is-active'); return; } insightsModal.querySelector('.modal-card-title').textContent = 'Trend Analysis'; const fastPeriod = parseInt(fastEmaSlider.value, 10), slowPeriod = parseInt(slowEmaSlider.value, 10); const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) }; const signals = findCrossoverSignals(full.fastEma, full.slowEma, full.macdLine, full.signalLine); const maxRises = [], maxFalls = []; let fallExceedsRiseCount = 0; downArrowIndices.forEach(downIndex => { const nextUpIndex = upArrowIndices.find(upIndex => upIndex > downIndex); if (nextUpIndex && downIndex > 0) { const anchorPrice = allPrices[downIndex - 1]; const periodPrices = allPrices.slice(downIndex, nextUpIndex + 1); if (periodPrices.length > 0 && anchorPrice > 0) { const risePercent = ((Math.max(...periodPrices) - anchorPrice) / anchorPrice) * 100; const fallPercent = ((Math.min(...periodPrices) - anchorPrice) / anchorPrice) * 100; maxRises.push(risePercent); maxFalls.push(fallPercent); if (Math.abs(fallPercent) > risePercent) fallExceedsRiseCount++; } } }); let triggerCount = 0, outcomeCount = 0; for (let i = 1; i < allPrices.length - 4; i++) { const isDownArrow = (full.fastEma[i] > full.slowEma[i]) && (full.macdLine[i-1] >= full.signalLine[i-1]) && (full.macdLine[i] < full.signalLine[i]); if (isDownArrow) { const hist1 = full.histogram[i+1], hist2 = full.histogram[i+2], hist3 = full.histogram[i+3]; const isStrengtheningDownwardMomentum = (hist1 < 0 && hist2 < 0 && hist3 < 0) && (hist2 < hist1) && (hist3 < hist2); if (isStrengtheningDownwardMomentum) { triggerCount++; for (let j = i + 4; j < allPrices.length; j++) { if (full.fastEma[j-1] >= full.slowEma[j-1] && full.fastEma[j] < full.slowEma[j]) { outcomeCount++; break; } } } } } let htmlResult = `<p>Based on the current settings (Fast EMA: ${fastPeriod}, Slow EMA: ${slowPeriod}):</p><hr>`; if (maxRises.length > 0) { const avgMaxRise = maxRises.reduce((a, b) => a + b, 0) / maxRises.length; const avgMaxFall = maxFalls.reduce((a, b) => a + b, 0) / maxFalls.length; const likelihood = (fallExceedsRiseCount / maxRises.length) * 100; htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong></p><ul><li><strong>Periods found:</strong> ${maxRises.length}</li><li><strong>Avg Max Rise %:</strong> <span style="color: #23d160;">${avgMaxRise.toFixed(2)}%</span></li><li><strong>Avg Max Fall %:</strong> <span style="color: #ff3860;">${avgMaxFall.toFixed(2)}%</span></li><li style="margin-top: 8px;"><strong>Likelihood of fall > rise:</strong> ${likelihood.toFixed(1)}%</li></ul>`; } else { htmlResult += `<p><strong>Down-to-Up Period Analysis:</strong> No valid periods found.</p>`; } htmlResult += `<hr>`; if (triggerCount > 0) { const probability = (outcomeCount / triggerCount) * 100; htmlResult += `<p><strong>Bearish Momentum Analysis:</strong></p><ul><li><strong>Signals found:</strong> ${triggerCount}</li><li><strong>Probability of subsequent EMA cross:</strong> ${probability.toFixed(1)}%</li></ul><p class="is-size-7" style="color: var(--dim-text);"><em>A "signal" is a down-arrow followed by 3 successively <strong>more negative</strong> red MACD bars. The probability measures how often a bearish EMA cross occurred after such a signal.</em></p>`; } else { htmlResult += `<p><strong>Bearish Momentum Analysis:</strong> No signals found with the current settings.</p>`; } insightsResult.innerHTML = htmlResult; insightsModal.classList.add('is-active'); }
             function getFilterStartIndex() { const period = timePeriodSelector.value, totalPoints = allDates.length; const weeksInYear = 52; if (period === 'all') return 0; if (period === '10yr') return Math.max(0, totalPoints - (10 * weeksInYear)); if (period === '7yr') return Math.max(0, totalPoints - (7 * weeksInYear)); if (period === '5yr') return Math.max(0, totalPoints - (5 * weeksInYear)); if (period === '3yr') return Math.max(0, totalPoints - (3 * weeksInYear)); if (period === '1yr') return Math.max(0, totalPoints - (1 * weeksInYear)); const now = new Date(); let startDate; if (period === 'ytd') { startDate = new Date(now.getFullYear(), 0, 1); } else if (period === 'mtd') { startDate = new Date(now.getFullYear(), now.getMonth(), 1); } const foundIndex = allDates.findIndex(d => new Date(d) >= startDate); return foundIndex !== -1 ? foundIndex : totalPoints; }
             function calculateSMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const sma = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; sma[period - 1] = sum / period; for (let i = period; i < data.length; i++) { sum = sum - data[i - period] + data[i]; sma[i] = sum / period; } return sma; }
             function calculateEMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const k = 2 / (period + 1); const ema = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; ema[period - 1] = sum / period; for (let i = period; i < data.length; i++) { if (ema[i-1] !== null) { ema[i] = (data[i] * k) + (ema[i - 1] * (1 - k)); } } return ema; }
