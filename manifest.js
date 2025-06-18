@@ -1,7 +1,7 @@
 {
   "name": "Stock Chart Viewer",
   "short_name": "Stock Viewer",
-  "start_url": ".",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1a1d21",
   "theme_color": "#1a1d21",

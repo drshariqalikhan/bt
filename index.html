@@ -174,7 +174,7 @@
                 const calculatedFV = calculateDCF(epsTTM, epsNext5Y / 100, terminalGrowthRate, discountRate);
                 fairValue = calculatedFV;
                 fairValueInput.value = fairValue.toFixed(2);
-                statusMessage.textContent = `Successfully calculated Fair Value: $${fairValue.toFixed(2)}`;
+                statusMessage.textContent = `Successfully calculated Fair Value of ${ticker}: $${fairValue.toFixed(2)}`;
             } catch (error) { console.error(`Fair Value Calculation Error: ${error.message}`); statusMessage.textContent = `Could not calculate Fair Value. ${error.message}`; fairValue = null; fairValueInput.value = ''; }
         }
 
