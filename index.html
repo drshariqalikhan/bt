@@ -151,27 +151,22 @@
                 backButton.addEventListener('click', () => {
                     mainPage.style.display = 'flex';
                     settingsPage.style.display = 'none';
-                    // Re-fetch with new settings when user goes back
                     fetchData();
                 });
                 
-                // Burger Menu Listener
                 const burger = document.querySelector('.navbar-burger');
                 const menu = document.getElementById(burger.dataset.target);
                 burger.addEventListener('click', () => { burger.classList.toggle('is-active'); menu.classList.toggle('is-active'); });
                 
-                // Main Functionality Listeners
                 fetchButton.addEventListener('click', fetchData);
                 tickerInput.addEventListener('keypress', e => { if (e.key === 'Enter') fetchData(); });
-                timePeriodSelector.addEventListener('change', processAndDraw);
                 deleteDataButton.addEventListener('click', () => {
                     if (confirm("Are you sure? This will clear all saved app data.")) {
                         localStorage.clear();
-                        loadSettings(); // Reload default settings into UI
+                        loadSettings();
                         alert("Cleared saved data.");
                     }
                 });
-                // Save settings whenever they change
                 discountRateInput.addEventListener('change', saveSettings);
                 terminalGrowthInput.addEventListener('change', saveSettings);
                 timePeriodSelector.addEventListener('change', saveSettings);
@@ -191,8 +186,11 @@
                     timePeriod: timePeriodSelector.value
                 };
                 localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+                // If on the main page, redraw immediately after settings change
+                if (mainPage.style.display !== 'none') {
+                    processAndDraw();
+                }
             }
-
             function loadSettings() {
                 const savedSettings = localStorage.getItem(SETTINGS_KEY);
                 const defaults = { discountRate: '9.5', terminalGrowth: '2.5', timePeriod: '5yr' };
@@ -210,36 +208,29 @@
             
             // --- SECTION 5: CORE LOGIC (DATA FETCHING & PROCESSING) ---
             async function fetchData() {
-                fairValue = null; // Reset fair value on each fetch
+                fairValue = null;
                 const ticker = tickerInput.value.trim().toUpperCase();
                 if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
-                
                 statusMessage.textContent = `Fetching data for ${ticker}...`;
                 clearCharts();
-
                 try {
                     const [priceData, fundamentalData] = await Promise.all([
                         fetchPriceData(ticker),
                         fetchAndParseFundamentals(ticker.split('.')[0])
                     ]);
-
                     allDates = priceData.dates;
                     allPrices = priceData.prices;
-                    
                     if (fundamentalData) {
                         const discountRate = parseFloat(discountRateInput.value) / 100;
                         const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
-                        fairValue = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
+                        if (!isNaN(discountRate) && !isNaN(terminalGrowthRate)) {
+                             fairValue = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
+                        }
                     }
-                    
                     localStorage.setItem(LAST_TICKER_KEY, ticker);
                     statusMessage.textContent = `Displaying ${ticker}`;
                     processAndDraw();
-
-                } catch (error) {
-                    statusMessage.textContent = `Error: ${error.message}`;
-                    console.error("Fetch error:", error);
-                }
+                } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error:", error); }
             }
             
             async function fetchPriceData(ticker) {
@@ -275,19 +266,30 @@
                     const epsNext5Y = parseFloat(data['EPS next 5Y']?.replace('%', ''));
                     if (isNaN(epsTTM) || isNaN(epsNext5Y)) return null;
                     return { epsTTM, epsNext5Y };
-                } catch (error) {
-                    console.error(`Fundamental data error for ${tickerSymbol}:`, error);
-                    return null; // Return null instead of throwing to not halt Promise.all
-                }
+                } catch (error) { console.error(`Fundamental data error for ${tickerSymbol}:`, error); return null; }
             }
 
             function processAndDraw() {
                 if (allPrices.length === 0) return;
                 const fastPeriod = 10, slowPeriod = 20;
-                const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) };
+                const full = {
+                    fastEma: calculateEMA(allPrices, fastPeriod),
+                    slowEma: calculateEMA(allPrices, slowPeriod),
+                    sma50: calculateSMA(allPrices, 50),   // --- NEW ---
+                    sma100: calculateSMA(allPrices, 100), // --- NEW ---
+                    ...calculateMACD(allPrices)
+                };
                 const startIndex = getFilterStartIndex();
                 const dates = allDates.slice(startIndex), prices = allPrices.slice(startIndex);
-                const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) };
+                const sliced = {
+                    fastEma: full.fastEma.slice(startIndex),
+                    slowEma: full.slowEma.slice(startIndex),
+                    sma50: full.sma50.slice(startIndex),   // --- NEW ---
+                    sma100: full.sma100.slice(startIndex), // --- NEW ---
+                    macdLine: full.macdLine.slice(startIndex),
+                    signalLine: full.signalLine.slice(startIndex),
+                    histogram: full.histogram.slice(startIndex)
+                };
                 if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data for selected time period."; return; }
                 drawPriceChart(dates, prices, sliced, fastPeriod, slowPeriod);
                 drawMacdChart(dates, prices, sliced);
@@ -296,6 +298,21 @@
             // --- SECTION 6: CALCULATION & CHARTING ---
             function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { let pvSum = 0; let currentEps = eps; for (let i = 1; i <= 5; i++) { currentEps *= (1 + growthRate5Y); pvSum += currentEps / Math.pow(1 + discountRate, i); } const terminalEps = currentEps * (1 + terminalGrowthRate); const terminalValue = terminalEps / (discountRate - terminalGrowthRate); const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5); return pvSum + pvTerminalValue; }
             function getFilterStartIndex() { const period = timePeriodSelector.value; const totalPoints = allDates.length; const weeksInYear = 52; if (period === 'all') return 0; if (period === '10yr') return Math.max(0, totalPoints - (10 * weeksInYear)); if (period === '5yr') return Math.max(0, totalPoints - (5 * weeksInYear)); if (period === '1yr') return Math.max(0, totalPoints - (1 * weeksInYear)); return 0; }
+            
+            // --- NEW: SMA Calculation Function ---
+            function calculateSMA(data, period) {
+                if (!data || data.length < period) return new Array(data.length).fill(null);
+                const sma = new Array(data.length).fill(null);
+                let sum = 0;
+                for (let i = 0; i < period; i++) sum += data[i];
+                sma[period - 1] = sum / period;
+                for (let i = period; i < data.length; i++) {
+                    sum = sum - data[i - period] + data[i];
+                    sma[i] = sum / period;
+                }
+                return sma;
+            }
+
             function calculateEMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const k = 2 / (period + 1); const ema = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; ema[period - 1] = sum / period; for (let i = period; i < data.length; i++) { if (ema[i-1] !== null) ema[i] = (data[i] * k) + (ema[i - 1] * (1 - k)); } return ema; }
             function calculateMACD(data, p12=12, p26=26, pSignal=9) { const ema12 = calculateEMA(data, p12); const ema26 = calculateEMA(data, p26); const macdLine = ema26.map((v, i) => v !== null && ema12[i] !== null ? ema12[i] - v : null); const signalLine = calculateEMA(macdLine, pSignal); const histogram = signalLine.map((v, i) => v !== null && macdLine[i] !== null ? macdLine[i] - v : null); return { macdLine, signalLine, histogram }; }
             function clearCharts() { priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height); macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height); }
@@ -303,6 +320,7 @@
             const drawLine = (ctx, data, mapX, mapY, color, lineWidth = 1.5) => { ctx.beginPath(); ctx.lineWidth = lineWidth; ctx.strokeStyle = color; let first = true; data.forEach((val, i) => { if (val !== null) { const x = mapX(i); const y = mapY(val); if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); } } }); ctx.stroke(); };
             
             function drawPriceChart(dates, prices, slicedData, fastPeriod, slowPeriod) {
+                const { fastEma, slowEma, sma50, sma100 } = slicedData; // --- NEW: Destructure SMAs
                 const container = priceCanvas.parentElement;
                 const w = container.clientWidth, h = container.clientHeight;
                 if (w <= 0 || h <= 0) return;
@@ -312,8 +330,9 @@
                 priceCtx.scale(devicePixelRatio, devicePixelRatio);
                 priceCtx.clearRect(0, 0, w, h);
 
-                let allVisibleData = [...prices, ...slicedData.fastEma.filter(v=>v), ...slicedData.slowEma.filter(v=>v)];
-                if (fairValue) allVisibleData.push(fairValue); // Include fair value in axis scaling
+                // --- NEW: Add SMAs to visible data for scaling ---
+                let allVisibleData = [...prices, ...fastEma.filter(v=>v), ...slowEma.filter(v=>v), ...sma50.filter(v=>v), ...sma100.filter(v=>v)];
+                if (fairValue) allVisibleData.push(fairValue);
                 
                 const minY = Math.min(...allVisibleData), maxY = Math.max(...allVisibleData);
                 const margin = { top: 20, right: 50, bottom: 40, left: 50 };
@@ -332,10 +351,11 @@
                 for (let i = 0; i < prices.length; i += xTickStep) { priceCtx.textAlign = 'center'; priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20); }
 
                 drawLine(priceCtx, prices, mapX, mapY, '#a0a0a0', 1.5);
-                drawLine(priceCtx, slicedData.fastEma, mapX, mapY, '#3273dc');
-                drawLine(priceCtx, slicedData.slowEma, mapX, mapY, '#23d160');
+                drawLine(priceCtx, fastEma, mapX, mapY, '#3273dc');
+                drawLine(priceCtx, slowEma, mapX, mapY, '#23d160');
+                drawLine(priceCtx, sma50, mapX, mapY, '#ff9800');   // --- NEW ---
+                drawLine(priceCtx, sma100, mapX, mapY, '#c56bf0'); // --- NEW ---
 
-                // Draw Fair Value Line
                 if (fairValue !== null && fairValue >= minY && fairValue <= maxY) {
                     const y = mapY(fairValue);
                     priceCtx.beginPath(); priceCtx.setLineDash([4, 4]); priceCtx.strokeStyle = '#ffd700'; priceCtx.lineWidth = 1.5;
@@ -350,6 +370,8 @@
                 priceCtx.fillStyle = '#a0a0a0'; priceCtx.fillText('Price', legX, legY);
                 priceCtx.fillStyle = '#3273dc'; priceCtx.fillText(`Fast EMA (${fastPeriod})`, legX, legY + sp);
                 priceCtx.fillStyle = '#23d160'; priceCtx.fillText(`Slow EMA (${slowPeriod})`, legX, legY + sp * 2);
+                priceCtx.fillStyle = '#ff9800'; priceCtx.fillText('50-week SMA', legX, legY + sp * 3);   // --- NEW ---
+                priceCtx.fillStyle = '#c56bf0'; priceCtx.fillText('100-week SMA', legX, legY + sp * 4); // --- NEW ---
             }
 
             function drawMacdChart(dates, prices, slicedData) {
