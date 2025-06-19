@@ -229,7 +229,7 @@
                         }
                     }
                     localStorage.setItem(LAST_TICKER_KEY, ticker);
-                    statusMessage.textContent = `Displaying ${ticker}`;
+                    statusMessage.textContent = `Displaying ${ticker} : $${fairValue}`;
                     processAndDraw();
                 } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error:", error); }
             }
