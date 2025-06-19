@@ -78,19 +78,24 @@
         </nav>
         <main class="page-content">
             <div class="settings-container">
-                 <h2 class="title is-4 has-text-light">Chart Display</h2>
+                <h2 class="title is-4 has-text-light">DCF Calculation</h2>
+                <div class="field settings-field">
+                    <label class="label" for="discountRateInput">Discount Rate (%)</label>
+                    <div class="control"><input class="input" type="number" id="discountRateInput" value="9.5" step="0.1"></div>
+                </div>
+                <div class="field settings-field">
+                    <label class="label" for="terminalGrowthInput">Terminal Growth Rate (%)</label>
+                    <div class="control"><input class="input" type="number" id="terminalGrowthInput" value="2.5" step="0.1"></div>
+                </div>
+                <div class="field settings-field">
+                    <label class="label" for="fairValueInput">Last Calculated Fair Value</label>
+                    <div class="control"><input class="input" type="text" id="fairValueInput" placeholder="N/A" readonly></div>
+                </div>
+                <hr style="background-color: var(--dark-border);">
+                <h2 class="title is-4 has-text-light">Chart Display</h2>
                 <div class="field settings-field">
                     <label class="label" for="timePeriodSelector">Time Period</label>
-                    <div class="control">
-                        <div class="select is-fullwidth">
-                            <select id="timePeriodSelector">
-                                <option value="all">All Time</option>
-                                <option value="10yr">10 Years</option>
-                                <option value="5yr" selected>5 Years</option>
-                                <option value="1yr">1 Year</option>
-                            </select>
-                        </div>
-                    </div>
+                    <div class="control"><div class="select is-fullwidth"><select id="timePeriodSelector"><option value="all">All Time</option><option value="10yr">10 Years</option><option value="5yr" selected>5 Years</option><option value="1yr">1 Year</option></select></div></div>
                 </div>
                 <hr style="background-color: var(--dark-border);">
                 <h2 class="title is-4 has-text-light">App Data</h2>
@@ -107,14 +112,15 @@
             // --- SECTION 1: CONSTANTS AND STATE ---
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
             const LAST_TICKER_KEY = 'qualitystock_lastTicker';
-            const SETTINGS_KEY = 'qualitystock_settings'; // Key for all settings
+            const SETTINGS_KEY = 'qualitystock_settings';
             let allDates = [], allPrices = [];
+            let fairValue = null;
 
             // --- SECTION 2: DOM ELEMENT REFERENCES ---
             let mainPage, settingsPage, goToSettingsButton, backButton,
                 tickerInput, fetchButton, timePeriodSelector,
                 priceCanvas, priceCtx, macdCanvas, macdCtx, statusMessage,
-                deleteDataButton;
+                deleteDataButton, discountRateInput, terminalGrowthInput, fairValueInput;
 
             // --- SECTION 3: PRIMARY EVENT LISTENER ---
             document.addEventListener('DOMContentLoaded', () => {
@@ -132,10 +138,22 @@
                 macdCtx = macdCanvas.getContext('2d');
                 statusMessage = document.getElementById('statusMessage');
                 deleteDataButton = document.getElementById('deleteDataButton');
+                discountRateInput = document.getElementById('discountRateInput');
+                terminalGrowthInput = document.getElementById('terminalGrowthInput');
+                fairValueInput = document.getElementById('fairValueInput');
 
                 // Page Navigation Listeners
-                goToSettingsButton.addEventListener('click', () => { mainPage.style.display = 'none'; settingsPage.style.display = 'flex'; });
-                backButton.addEventListener('click', () => { mainPage.style.display = 'flex'; settingsPage.style.display = 'none'; });
+                goToSettingsButton.addEventListener('click', () => {
+                    mainPage.style.display = 'none';
+                    settingsPage.style.display = 'flex';
+                    fairValueInput.value = fairValue ? `$${fairValue.toFixed(2)}` : 'N/A';
+                });
+                backButton.addEventListener('click', () => {
+                    mainPage.style.display = 'flex';
+                    settingsPage.style.display = 'none';
+                    // Re-fetch with new settings when user goes back
+                    fetchData();
+                });
                 
                 // Burger Menu Listener
                 const burger = document.querySelector('.navbar-burger');
@@ -145,6 +163,7 @@
                 // Main Functionality Listeners
                 fetchButton.addEventListener('click', fetchData);
                 tickerInput.addEventListener('keypress', e => { if (e.key === 'Enter') fetchData(); });
+                timePeriodSelector.addEventListener('change', processAndDraw);
                 deleteDataButton.addEventListener('click', () => {
                     if (confirm("Are you sure? This will clear all saved app data.")) {
                         localStorage.clear();
@@ -152,15 +171,10 @@
                         alert("Cleared saved data.");
                     }
                 });
-
-                // --- DYNAMIC SETTINGS CHANGE LISTENER ---
-                timePeriodSelector.addEventListener('change', () => {
-                    saveSettings();
-                    // Automatically go back and redraw
-                    mainPage.style.display = 'flex';
-                    settingsPage.style.display = 'none';
-                    processAndDraw(); 
-                });
+                // Save settings whenever they change
+                discountRateInput.addEventListener('change', saveSettings);
+                terminalGrowthInput.addEventListener('change', saveSettings);
+                timePeriodSelector.addEventListener('change', saveSettings);
 
                 // --- App Initialization ---
                 loadSettings();
@@ -168,10 +182,12 @@
                 if (lastTicker) { tickerInput.value = lastTicker; }
                 fetchData();
             });
-
+            
             // --- SECTION 4: SETTINGS MANAGEMENT ---
             function saveSettings() {
                 const settings = {
+                    discountRate: discountRateInput.value,
+                    terminalGrowth: terminalGrowthInput.value,
                     timePeriod: timePeriodSelector.value
                 };
                 localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -179,17 +195,22 @@
 
             function loadSettings() {
                 const savedSettings = localStorage.getItem(SETTINGS_KEY);
+                const defaults = { discountRate: '9.5', terminalGrowth: '2.5', timePeriod: '5yr' };
                 if (savedSettings) {
                     const settings = JSON.parse(savedSettings);
-                    timePeriodSelector.value = settings.timePeriod || '5yr';
+                    discountRateInput.value = settings.discountRate || defaults.discountRate;
+                    terminalGrowthInput.value = settings.terminalGrowth || defaults.terminalGrowth;
+                    timePeriodSelector.value = settings.timePeriod || defaults.timePeriod;
                 } else {
-                    // Load defaults if no settings saved
-                    timePeriodSelector.value = '5yr';
+                    discountRateInput.value = defaults.discountRate;
+                    terminalGrowthInput.value = defaults.terminalGrowth;
+                    timePeriodSelector.value = defaults.timePeriod;
                 }
             }
-
+            
             // --- SECTION 5: CORE LOGIC (DATA FETCHING & PROCESSING) ---
             async function fetchData() {
+                fairValue = null; // Reset fair value on each fetch
                 const ticker = tickerInput.value.trim().toUpperCase();
                 if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
                 
@@ -197,40 +218,19 @@
                 clearCharts();
 
                 try {
-                    const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`;
-                    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;
-                    const response = await fetch(proxyUrl);
-                    if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+                    const [priceData, fundamentalData] = await Promise.all([
+                        fetchPriceData(ticker),
+                        fetchAndParseFundamentals(ticker.split('.')[0])
+                    ]);
+
+                    allDates = priceData.dates;
+                    allPrices = priceData.prices;
                     
-                    const rawData = await response.text();
-                    if (rawData.trim().startsWith('<') || !rawData.toUpperCase().includes('DATE')) {
-                        throw new Error('Invalid data format or ticker not found.');
+                    if (fundamentalData) {
+                        const discountRate = parseFloat(discountRateInput.value) / 100;
+                        const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
+                        fairValue = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
                     }
-
-                    const lines = rawData.trim().split('\n');
-                    const headerLine = lines.shift();
-                    const delimiter = headerLine.includes(';') ? ';' : ',';
-                    const headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
-                    const dateIndex = headers.indexOf('DATE');
-                    const closeIndex = headers.indexOf('CLOSE');
-
-                    if (dateIndex === -1 || closeIndex === -1) throw new Error('Could not find "DATE" or "CLOSE" columns.');
-
-                    allDates = [];
-                    allPrices = [];
-                    lines.forEach(line => {
-                        const columns = line.split(delimiter);
-                        if (columns.length > Math.max(dateIndex, closeIndex)) {
-                            const dateStr = columns[dateIndex];
-                            const closePrice = parseFloat(columns[closeIndex]);
-                            if (dateStr && !isNaN(closePrice)) {
-                                allDates.push(dateStr);
-                                allPrices.push(closePrice);
-                            }
-                        }
-                    });
-
-                    if (allPrices.length === 0) throw new Error("No valid price data rows found.");
                     
                     localStorage.setItem(LAST_TICKER_KEY, ticker);
                     statusMessage.textContent = `Displaying ${ticker}`;
@@ -242,90 +242,65 @@
                 }
             }
             
+            async function fetchPriceData(ticker) {
+                const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`;
+                const proxyUrl = `${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error(`Network error fetching price data`);
+                const rawData = await response.text();
+                if (rawData.trim().startsWith('<') || !rawData.toUpperCase().includes('DATE')) throw new Error('Invalid price data or ticker not found.');
+                const lines = rawData.trim().split('\n');
+                const headerLine = lines.shift(), delimiter = headerLine.includes(';') ? ';' : ',', headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
+                const dateIndex = headers.indexOf('DATE'), closeIndex = headers.indexOf('CLOSE');
+                if (dateIndex === -1 || closeIndex === -1) throw new Error('Could not parse price data columns.');
+                const dates = [], prices = [];
+                lines.forEach(line => { const cols = line.split(delimiter); if (cols.length > Math.max(dateIndex, closeIndex)) { const dateStr = cols[dateIndex], closePrice = parseFloat(cols[closeIndex]); if (dateStr && !isNaN(closePrice)) { dates.push(dateStr); prices.push(closePrice); } } });
+                if (prices.length === 0) throw new Error("No valid price data rows found.");
+                return { dates, prices };
+            }
+
+            async function fetchAndParseFundamentals(tickerSymbol) {
+                 if (!tickerSymbol) return null;
+                try {
+                    const targetUrl = `https://finviz.com/quote.ashx?t=${tickerSymbol}`;
+                    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error(`Finviz network error`);
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, "text/html");
+                    const data = {};
+                    doc.querySelectorAll('.snapshot-table2 td').forEach((cell, i) => { if (i % 2 === 0) { const key = cell.textContent.trim(); if (doc.querySelectorAll('.snapshot-table2 td')[i+1]) { data[key] = doc.querySelectorAll('.snapshot-table2 td')[i+1].textContent.trim(); } } });
+                    const epsTTM = parseFloat(data['EPS (ttm)']);
+                    const epsNext5Y = parseFloat(data['EPS next 5Y']?.replace('%', ''));
+                    if (isNaN(epsTTM) || isNaN(epsNext5Y)) return null;
+                    return { epsTTM, epsNext5Y };
+                } catch (error) {
+                    console.error(`Fundamental data error for ${tickerSymbol}:`, error);
+                    return null; // Return null instead of throwing to not halt Promise.all
+                }
+            }
+
             function processAndDraw() {
                 if (allPrices.length === 0) return;
-
                 const fastPeriod = 10, slowPeriod = 20;
-                const full = {
-                    fastEma: calculateEMA(allPrices, fastPeriod),
-                    slowEma: calculateEMA(allPrices, slowPeriod),
-                    ...calculateMACD(allPrices)
-                };
-
+                const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) };
                 const startIndex = getFilterStartIndex();
-                const dates = allDates.slice(startIndex);
-                const prices = allPrices.slice(startIndex);
-                const sliced = {
-                    fastEma: full.fastEma.slice(startIndex),
-                    slowEma: full.slowEma.slice(startIndex),
-                    macdLine: full.macdLine.slice(startIndex),
-                    signalLine: full.signalLine.slice(startIndex),
-                    histogram: full.histogram.slice(startIndex)
-                };
-
-                if (prices.length === 0) {
-                    clearCharts();
-                    statusMessage.textContent = "No data available for the selected time period.";
-                    return;
-                }
-
+                const dates = allDates.slice(startIndex), prices = allPrices.slice(startIndex);
+                const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) };
+                if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data for selected time period."; return; }
                 drawPriceChart(dates, prices, sliced, fastPeriod, slowPeriod);
                 drawMacdChart(dates, prices, sliced);
             }
 
             // --- SECTION 6: CALCULATION & CHARTING ---
-            function getFilterStartIndex() {
-                const period = timePeriodSelector.value;
-                const totalPoints = allDates.length;
-                const weeksInYear = 52;
-                if (period === 'all') return 0;
-                if (period === '10yr') return Math.max(0, totalPoints - (10 * weeksInYear));
-                if (period === '5yr') return Math.max(0, totalPoints - (5 * weeksInYear));
-                if (period === '1yr') return Math.max(0, totalPoints - (1 * weeksInYear));
-                return 0;
-            }
+            function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { let pvSum = 0; let currentEps = eps; for (let i = 1; i <= 5; i++) { currentEps *= (1 + growthRate5Y); pvSum += currentEps / Math.pow(1 + discountRate, i); } const terminalEps = currentEps * (1 + terminalGrowthRate); const terminalValue = terminalEps / (discountRate - terminalGrowthRate); const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5); return pvSum + pvTerminalValue; }
+            function getFilterStartIndex() { const period = timePeriodSelector.value; const totalPoints = allDates.length; const weeksInYear = 52; if (period === 'all') return 0; if (period === '10yr') return Math.max(0, totalPoints - (10 * weeksInYear)); if (period === '5yr') return Math.max(0, totalPoints - (5 * weeksInYear)); if (period === '1yr') return Math.max(0, totalPoints - (1 * weeksInYear)); return 0; }
+            function calculateEMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const k = 2 / (period + 1); const ema = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; ema[period - 1] = sum / period; for (let i = period; i < data.length; i++) { if (ema[i-1] !== null) ema[i] = (data[i] * k) + (ema[i - 1] * (1 - k)); } return ema; }
+            function calculateMACD(data, p12=12, p26=26, pSignal=9) { const ema12 = calculateEMA(data, p12); const ema26 = calculateEMA(data, p26); const macdLine = ema26.map((v, i) => v !== null && ema12[i] !== null ? ema12[i] - v : null); const signalLine = calculateEMA(macdLine, pSignal); const histogram = signalLine.map((v, i) => v !== null && macdLine[i] !== null ? macdLine[i] - v : null); return { macdLine, signalLine, histogram }; }
+            function clearCharts() { priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height); macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height); }
 
-            function calculateEMA(data, period) {
-                if (!data || data.length < period) return new Array(data.length).fill(null);
-                const k = 2 / (period + 1);
-                const ema = new Array(data.length).fill(null);
-                let sum = 0;
-                for (let i = 0; i < period; i++) sum += data[i];
-                ema[period - 1] = sum / period;
-                for (let i = period; i < data.length; i++) {
-                    if (ema[i-1] !== null) ema[i] = (data[i] * k) + (ema[i - 1] * (1 - k));
-                }
-                return ema;
-            }
-
-            function calculateMACD(data, p12=12, p26=26, pSignal=9) {
-                const ema12 = calculateEMA(data, p12);
-                const ema26 = calculateEMA(data, p26);
-                const macdLine = ema26.map((v, i) => v !== null && ema12[i] !== null ? ema12[i] - v : null);
-                const signalLine = calculateEMA(macdLine, pSignal);
-                const histogram = signalLine.map((v, i) => v !== null && macdLine[i] !== null ? macdLine[i] - v : null);
-                return { macdLine, signalLine, histogram };
-            }
-
-            function clearCharts() {
-                priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height);
-                macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height);
-            }
-
-            const drawLine = (ctx, data, mapX, mapY, color, lineWidth = 1.5) => {
-                ctx.beginPath();
-                ctx.lineWidth = lineWidth;
-                ctx.strokeStyle = color;
-                let first = true;
-                data.forEach((val, i) => {
-                    if (val !== null) {
-                        const x = mapX(i);
-                        const y = mapY(val);
-                        if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
-                    }
-                });
-                ctx.stroke();
-            };
+            const drawLine = (ctx, data, mapX, mapY, color, lineWidth = 1.5) => { ctx.beginPath(); ctx.lineWidth = lineWidth; ctx.strokeStyle = color; let first = true; data.forEach((val, i) => { if (val !== null) { const x = mapX(i); const y = mapY(val); if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); } } }); ctx.stroke(); };
             
             function drawPriceChart(dates, prices, slicedData, fastPeriod, slowPeriod) {
                 const container = priceCanvas.parentElement;
@@ -337,38 +312,41 @@
                 priceCtx.scale(devicePixelRatio, devicePixelRatio);
                 priceCtx.clearRect(0, 0, w, h);
 
-                const allVisibleData = [...prices, ...slicedData.fastEma.filter(v=>v), ...slicedData.slowEma.filter(v=>v)];
+                let allVisibleData = [...prices, ...slicedData.fastEma.filter(v=>v), ...slicedData.slowEma.filter(v=>v)];
+                if (fairValue) allVisibleData.push(fairValue); // Include fair value in axis scaling
+                
                 const minY = Math.min(...allVisibleData), maxY = Math.max(...allVisibleData);
                 const margin = { top: 20, right: 50, bottom: 40, left: 50 };
                 const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom;
-
                 const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2);
                 const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH;
                 
-                priceCtx.font = "12px sans-serif";
-                priceCtx.textAlign = 'right';
-                priceCtx.fillStyle = '#a0a0a0';
+                priceCtx.font = "12px sans-serif"; priceCtx.textAlign = 'right'; priceCtx.fillStyle = '#a0a0a0';
                 for (let i = 0; i <= 5; i++) {
-                    const val = minY + (i / 5) * (maxY - minY);
-                    const y = mapY(val);
+                    const val = minY + (i / 5) * (maxY - minY); const y = mapY(val);
                     priceCtx.beginPath(); priceCtx.strokeStyle = '#444'; priceCtx.lineWidth = 0.5;
                     priceCtx.moveTo(margin.left, y); priceCtx.lineTo(w - margin.right, y);
-                    priceCtx.stroke();
-                    priceCtx.fillText(val.toFixed(2), margin.left - 8, y + 4);
+                    priceCtx.stroke(); priceCtx.fillText(val.toFixed(2), margin.left - 8, y + 4);
                 }
                 const xTickStep = Math.max(1, Math.floor(prices.length / Math.floor(chartW / 100)));
-                for (let i = 0; i < prices.length; i += xTickStep) {
-                    priceCtx.textAlign = 'center';
-                    priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20);
-                }
+                for (let i = 0; i < prices.length; i += xTickStep) { priceCtx.textAlign = 'center'; priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20); }
 
                 drawLine(priceCtx, prices, mapX, mapY, '#a0a0a0', 1.5);
                 drawLine(priceCtx, slicedData.fastEma, mapX, mapY, '#3273dc');
                 drawLine(priceCtx, slicedData.slowEma, mapX, mapY, '#23d160');
 
+                // Draw Fair Value Line
+                if (fairValue !== null && fairValue >= minY && fairValue <= maxY) {
+                    const y = mapY(fairValue);
+                    priceCtx.beginPath(); priceCtx.setLineDash([4, 4]); priceCtx.strokeStyle = '#ffd700'; priceCtx.lineWidth = 1.5;
+                    priceCtx.moveTo(margin.left, y); priceCtx.lineTo(w - margin.right, y);
+                    priceCtx.stroke(); priceCtx.setLineDash([]);
+                    priceCtx.font = "12px sans-serif"; priceCtx.fillStyle = '#ffd700'; priceCtx.textAlign = 'left';
+                    priceCtx.fillText('Fair Value', w - margin.right + 5, y + 4);
+                }
+
                 const legX = margin.left + 10, legY = margin.top + 10, sp = 18;
-                priceCtx.font = "14px sans-serif";
-                priceCtx.textAlign = 'left';
+                priceCtx.font = "14px sans-serif"; priceCtx.textAlign = 'left';
                 priceCtx.fillStyle = '#a0a0a0'; priceCtx.fillText('Price', legX, legY);
                 priceCtx.fillStyle = '#3273dc'; priceCtx.fillText(`Fast EMA (${fastPeriod})`, legX, legY + sp);
                 priceCtx.fillStyle = '#23d160'; priceCtx.fillText(`Slow EMA (${slowPeriod})`, legX, legY + sp * 2);
@@ -380,8 +358,7 @@
                 const w = container.clientWidth, h = container.clientHeight;
                 if (w <= 0 || h <= 0) return;
                 
-                macdCanvas.width = w * devicePixelRatio;
-                macdCanvas.height = h * devicePixelRatio;
+                macdCanvas.width = w * devicePixelRatio; macdCanvas.height = h * devicePixelRatio;
                 macdCtx.scale(devicePixelRatio, devicePixelRatio);
                 macdCtx.clearRect(0, 0, w, h);
 
@@ -390,7 +367,6 @@
                 const minY = Math.min(...allVisibleData), maxY = Math.max(...allVisibleData);
                 const margin = { top: 20, right: 50, bottom: 40, left: 50 };
                 const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom;
-
                 const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2);
                 const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH;
 
@@ -408,13 +384,11 @@
                         macdCtx.fillRect(x, y, barW, yZero - y);
                     }
                 }
-
                 drawLine(macdCtx, macdLine, mapX, mapY, '#007bff');
                 drawLine(macdCtx, signalLine, mapX, mapY, '#fd7e14');
 
                 const legX = margin.left + 10, legY = margin.top + 10, sp = 18;
-                macdCtx.font = "14px sans-serif";
-                macdCtx.textAlign = 'left';
+                macdCtx.font = "14px sans-serif"; macdCtx.textAlign = 'left';
                 macdCtx.fillStyle = '#007bff'; macdCtx.fillText('MACD Line', legX, legY);
                 macdCtx.fillStyle = '#fd7e14'; macdCtx.fillText('Signal Line', legX, legY + sp);
             }
