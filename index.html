@@ -78,9 +78,9 @@
         </nav>
         <main class="page-content">
             <div class="settings-container">
-                <h2 class="title is-4 has-text-light">Chart Display</h2>
+                 <h2 class="title is-4 has-text-light">Chart Display</h2>
                 <div class="field settings-field">
-                    <label class="label" for="timePeriodSelector">Default Time Period</label>
+                    <label class="label" for="timePeriodSelector">Time Period</label>
                     <div class="control">
                         <div class="select is-fullwidth">
                             <select id="timePeriodSelector">
@@ -96,7 +96,7 @@
                 <h2 class="title is-4 has-text-light">App Data</h2>
                 <div class="field">
                     <div class="control"><button class="button is-danger" id="deleteDataButton">Clear All Saved Data</button></div>
-                    <p class="help has-text-grey">This will clear the last viewed ticker.</p>
+                    <p class="help has-text-grey">This will clear the last viewed ticker and any saved settings.</p>
                 </div>
             </div>
         </main>
@@ -107,6 +107,7 @@
             // --- SECTION 1: CONSTANTS AND STATE ---
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
             const LAST_TICKER_KEY = 'qualitystock_lastTicker';
+            const SETTINGS_KEY = 'qualitystock_settings'; // Key for all settings
             let allDates = [], allPrices = [];
 
             // --- SECTION 2: DOM ELEMENT REFERENCES ---
@@ -144,21 +145,50 @@
                 // Main Functionality Listeners
                 fetchButton.addEventListener('click', fetchData);
                 tickerInput.addEventListener('keypress', e => { if (e.key === 'Enter') fetchData(); });
-                timePeriodSelector.addEventListener('change', processAndDraw);
                 deleteDataButton.addEventListener('click', () => {
-                    if (confirm("Are you sure? This will clear the last saved ticker.")) {
-                        localStorage.removeItem(LAST_TICKER_KEY);
+                    if (confirm("Are you sure? This will clear all saved app data.")) {
+                        localStorage.clear();
+                        loadSettings(); // Reload default settings into UI
                         alert("Cleared saved data.");
                     }
                 });
 
+                // --- DYNAMIC SETTINGS CHANGE LISTENER ---
+                timePeriodSelector.addEventListener('change', () => {
+                    saveSettings();
+                    // Automatically go back and redraw
+                    mainPage.style.display = 'flex';
+                    settingsPage.style.display = 'none';
+                    processAndDraw(); 
+                });
+
                 // --- App Initialization ---
+                loadSettings();
                 const lastTicker = localStorage.getItem(LAST_TICKER_KEY);
                 if (lastTicker) { tickerInput.value = lastTicker; }
                 fetchData();
             });
 
-            // --- SECTION 4: CORE LOGIC (DATA FETCHING & PROCESSING) ---
+            // --- SECTION 4: SETTINGS MANAGEMENT ---
+            function saveSettings() {
+                const settings = {
+                    timePeriod: timePeriodSelector.value
+                };
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            }
+
+            function loadSettings() {
+                const savedSettings = localStorage.getItem(SETTINGS_KEY);
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    timePeriodSelector.value = settings.timePeriod || '5yr';
+                } else {
+                    // Load defaults if no settings saved
+                    timePeriodSelector.value = '5yr';
+                }
+            }
+
+            // --- SECTION 5: CORE LOGIC (DATA FETCHING & PROCESSING) ---
             async function fetchData() {
                 const ticker = tickerInput.value.trim().toUpperCase();
                 if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
@@ -179,7 +209,6 @@
 
                     const lines = rawData.trim().split('\n');
                     const headerLine = lines.shift();
-                    // --- FIX: Robustly determine the delimiter ---
                     const delimiter = headerLine.includes(';') ? ';' : ',';
                     const headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
                     const dateIndex = headers.indexOf('DATE');
@@ -216,8 +245,7 @@
             function processAndDraw() {
                 if (allPrices.length === 0) return;
 
-                const fastPeriod = 10;
-                const slowPeriod = 20;
+                const fastPeriod = 10, slowPeriod = 20;
                 const full = {
                     fastEma: calculateEMA(allPrices, fastPeriod),
                     slowEma: calculateEMA(allPrices, slowPeriod),
@@ -245,7 +273,7 @@
                 drawMacdChart(dates, prices, sliced);
             }
 
-            // --- SECTION 5: CALCULATION HELPERS ---
+            // --- SECTION 6: CALCULATION & CHARTING ---
             function getFilterStartIndex() {
                 const period = timePeriodSelector.value;
                 const totalPoints = allDates.length;
@@ -279,7 +307,6 @@
                 return { macdLine, signalLine, histogram };
             }
 
-            // --- SECTION 6: CHARTING FUNCTIONS ---
             function clearCharts() {
                 priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height);
                 macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height);
