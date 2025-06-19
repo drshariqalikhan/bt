@@ -1,65 +1,137 @@
 <!DOCTYPE html>
-<html class="has-navbar-fixed-top is-dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>QualityStock Screener</title>
     
-    <meta name="description" content="A quality stock screener and technical analysis tool.">
-    <meta name="theme-color" content="#363636">
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1a1d21">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="QualityStock">
 
+    <!-- PWA Manifest & Icons (assumed to be in the root directory) -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+
+    <!-- Stylesheet -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
 
     <style>
-        /* Base Theme */
-        :root { --dark-bg-1: #1a1d21; --dark-bg-2: #272a2e; --dark-border: #444; --light-text: #f0f0f0; --dim-text: #a0a0a0; }
-        html { background-color: var(--dark-bg-1); }
-        body { background-color: var(--dark-bg-1); color: var(--light-text); }
-        .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); }
-        .navbar-item, .navbar-link { color: var(--light-text); cursor: pointer; }
-        .navbar-link:not(.is-arrowless)::after { border-color: #3273dc; }
-        .input, .select select { background-color: var(--dark-bg-1); border-color: var(--dark-border); color: var(--light-text); }
+        /* --- Base Theme --- */
+        :root { 
+            --dark-bg-1: #1a1d21; 
+            --dark-bg-2: #272a2e; 
+            --dark-border: #444; 
+            --light-text: #f0f0f0; 
+            --dim-text: #a0a0a0; 
+            --accent-color: #3298dc;
+        }
+        html { 
+            background-color: var(--dark-bg-1); 
+            height: 100svh; /* Use small viewport height for better mobile fit */
+        }
+        body { 
+            background-color: var(--dark-bg-1); 
+            color: var(--light-text);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            margin: 0;
+        }
+        
+        /* --- General UI Elements --- */
+        .navbar { 
+            background-color: var(--dark-bg-2); 
+            border-bottom: 1px solid var(--dark-border); 
+        }
+        .navbar-item, .navbar-link { 
+            color: var(--light-text); 
+            cursor: pointer; 
+        }
+        .navbar-burger span {
+            background-color: var(--light-text);
+        }
+        .input, .select select { 
+            background-color: var(--dark-bg-1); 
+            border-color: var(--dark-border); 
+            color: var(--light-text); 
+        }
         .input::placeholder { color: var(--dim-text); }
-        .label, .has-text-weight-bold { color: var(--light-text); }
-        .modal-card-body { color: #3298dc; }
+        .label { color: var(--light-text); }
 
-        /* Page Layout */
-        html { height: 100svh; }
-        body { display: flex; flex-direction: column; min-height: 100svh; }
-        .page { display: flex; flex-direction: column; height: 100%; width: 100%; }
-        #settingsPage { display: none; }
-        .page-nav { padding-top: env(safe-area-inset-top); }
-        .page-content { flex-grow: 1; height: 1px; padding-bottom: env(safe-area-inset-bottom); overflow-y: auto; }
-        #mainPage .page-content { padding-top: var(--bulma-navbar-height); }
-        #appContainer { flex-grow: 1; display: flex; gap: 10px; flex-direction: column; padding: 1rem; }
-        @media screen and (min-width: 769px) { #appContainer { flex-direction: row; } }
-        #left-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-        .chart-wrapper { background-color: var(--dark-bg-2); border-radius: 6px; position: relative; flex: 1 1 0; min-height: 0; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .settings-field { max-width: 400px; margin-bottom: 1.5rem; }
+        /* --- Page Layout & iOS Safe Area Handling --- */
+        .page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+        #settingsPage {
+            display: none; /* Hidden by default */
+        }
+        .page-nav {
+            /* Add padding to account for the iOS status bar/notch */
+            padding-top: env(safe-area-inset-top);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            flex-shrink: 0; /* Prevent navbar from shrinking */
+        }
+        .page-content {
+            flex-grow: 1; /* Allow content to fill remaining space */
+            overflow-y: auto; /* Allow content to scroll if it overflows */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            /* Add padding at the bottom for the iOS home indicator bar */
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* --- Main Page Chart Layout --- */
+        #appContainer { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 1rem;
+            height: 100%;
+            padding: 1rem;
+        }
+        .chart-placeholder {
+            background-color: var(--dark-bg-2);
+            border: 1px dashed var(--dark-border);
+            border-radius: 6px;
+            flex: 1; /* Each chart takes up equal space */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--dim-text);
+            min-height: 200px; /* Ensure visibility on all screen sizes */
+        }
+
+        /* --- Settings Page Layout --- */
+        .settings-container {
+             padding: 1.5rem;
+        }
+        .settings-field { 
+            max-width: 400px; 
+            margin-bottom: 1.5rem; 
+        }
     </style>
 </head>
 <body>
 
     <!-- PAGE 1: MAIN PAGE (CHARTS) -->
-    <div id="mainPage" class="page" style="display: flex;">
-        <nav class="navbar is-fixed-top page-nav" role="navigation" aria-label="main navigation">
+    <div id="mainPage" class="page">
+        <nav class="navbar page-nav" role="navigation" aria-label="main navigation">
             <div class="navbar-brand">
                 <a class="navbar-item has-text-weight-bold" id="qualityScreenButton">Quality Screen</a>
-                <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicMenu"><span></span><span></span><span></span><span></span></a>
+                <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicMenu"><span></span><span></span><span></span></a>
             </div>
             <div id="navbarBasicMenu" class="navbar-menu">
                 <div class="navbar-start">
                     <div class="navbar-item">
                         <div class="field is-grouped">
-                            <p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US" placeholder="e.g., AAPL.US" aria-label="Ticker Symbol Input"></p>
-                            <p class="control"><button id="fetchButton" class="button is-info" aria-label="Fetch stock data">Fetch</button></p>
+                            <p class="control is-expanded"><input class="input" type="text" id="tickerInput" placeholder="e.g., AAPL.US"></p>
+                            <p class="control"><button id="fetchButton" class="button is-info">Fetch</button></p>
                         </div>
                     </div>
                     <a class="navbar-item" id="goToSettingsButton">Settings</a>
@@ -67,255 +139,126 @@
             </div>
         </nav>
 
-        <section class="page-content">
+        <main class="page-content">
             <div id="appContainer">
-                <div id="left-panel">
-                    <div id="priceChartContainer" class="chart-wrapper"><canvas id="priceChart"></canvas></div>
-                    <div id="macdChartContainer" class="chart-wrapper"><canvas id="macdChart"></canvas></div>
+                <div id="priceChartPlaceholder" class="chart-placeholder">
+                    <span>Price Chart Area</span>
+                </div>
+                <div id="macdChartPlaceholder" class="chart-placeholder">
+                    <span>MACD Chart Area</span>
                 </div>
             </div>
-            <div id="statusMessage" class="has-text-centered mt-2" role="status" aria-live="polite"></div>
-        </section>
+        </main>
     </div>
 
     <!-- PAGE 2: SETTINGS PAGE -->
     <div id="settingsPage" class="page">
         <nav class="navbar page-nav">
-            <div class="navbar-brand"><a class="navbar-item" id="backButton">< Back</a></div>
-            <div class="navbar-menu is-active"><div class="navbar-start"><div class="navbar-item has-text-weight-bold">Settings</div></div></div>
+            <div class="navbar-brand">
+                <a class="navbar-item" id="backButton">< Back</a>
+            </div>
+            <div class="navbar-menu is-active">
+                <div class="navbar-start">
+                    <div class="navbar-item has-text-weight-bold">Settings</div>
+                </div>
+            </div>
         </nav>
 
-        <section class="page-content">
-            <div class="container p-4">
+        <main class="page-content">
+            <div class="settings-container">
                 <h2 class="title is-4 has-text-light">Calculations</h2>
-                <div class="field settings-field"><label class="label" for="discountRateInput">Discount Rate (%)</label><div class="control"><input class="input" type="number" id="discountRateInput" value="9.5" step="0.1"></div></div>
-                <div class="field settings-field"><label class="label" for="terminalGrowthInput">Terminal Growth Rate (%)</label><div class="control"><input class="input" type="number" id="terminalGrowthInput" value="2.5" step="0.1"></div></div>
-                <div class="field settings-field"><label class="label" for="fairValueInput">DCF Fair Value</label><div class="control"><input class="input" type="text" id="fairValueInput" placeholder="Calculated on Main Page..." readonly></div></div>
-                <hr>
+                <div class="field settings-field">
+                    <label class="label" for="discountRateInput">Discount Rate (%)</label>
+                    <div class="control">
+                        <input class="input" type="number" id="discountRateInput" value="9.5" step="0.1">
+                    </div>
+                </div>
+                <div class="field settings-field">
+                    <label class="label" for="terminalGrowthInput">Terminal Growth Rate (%)</label>
+                    <div class="control">
+                        <input class="input" type="number" id="terminalGrowthInput" value="2.5" step="0.1">
+                    </div>
+                </div>
+
+                <hr style="background-color: var(--dark-border);">
+
                 <h2 class="title is-4 has-text-light">Chart Display</h2>
-                <div class="field settings-field"><label class="label" for="timePeriodSelector">Default Time Period</label><div class="control"><div class="select is-fullwidth"><select id="timePeriodSelector"><option value="all">All Time</option><option value="10yr">10 Years</option><option value="7yr">7 Years</option><option value="5yr" selected>5 Years</option><option value="3yr">3 Years</option><option value="1yr">1 Year</option></select></div></div></div>
-                <hr>
+                <div class="field settings-field">
+                    <label class="label" for="timePeriodSelector">Default Time Period</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select id="timePeriodSelector">
+                                <option value="all">All Time</option>
+                                <option value="10yr">10 Years</option>
+                                <option value="5yr" selected>5 Years</option>
+                                <option value="1yr">1 Year</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="background-color: var(--dark-border);">
+                
                 <h2 class="title is-4 has-text-light">App Data</h2>
-                <div class="field"><div class="control"><button class="button is-danger" id="deleteDataButton">Clear Saved Ticker & App Data</button></div><p class="help has-text-grey">This will clear the last viewed ticker and any other stored app settings.</p></div>
-                <div id="settingsStatusMessage" class="has-text-centered mt-4" role="status"></div>
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-danger" id="deleteDataButton">Clear All Saved Data</button>
+                    </div>
+                    <p class="help has-text-grey">This will clear the last viewed ticker and any saved settings.</p>
+                </div>
             </div>
-        </section>
+        </main>
     </div>
 
-    <div class="modal" id="insightsModal"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Analysis</p><button class="delete" aria-label="close"></button></header><section class="modal-card-body" id="insightsResult"></section></div></div>
-
     <script>
-        (function() {
-            // --- CONSTANTS AND STATE ---
-            const PROXIES = [ "https://api.allorigins.win/raw?url=", "https://cors-anywhere.herokuapp.com/" ];
-            let currentProxyIndex = 0;
-            const LAST_TICKER_KEY = 'qualitystock_lastTicker';
-            const SETTINGS_KEY = 'qualitystock_settings';
-            let allDates = [], allPrices = [];
-            let fairValue = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Element References ---
+            const mainPage = document.getElementById('mainPage');
+            const settingsPage = document.getElementById('settingsPage');
+            const goToSettingsButton = document.getElementById('goToSettingsButton');
+            const backButton = document.getElementById('backButton');
+            const burger = document.querySelector('.navbar-burger');
+            const menu = document.getElementById(burger.dataset.target);
+            
+            // --- Page Navigation Logic ---
+            goToSettingsButton.addEventListener('click', () => {
+                mainPage.style.display = 'none';
+                settingsPage.style.display = 'flex';
+            });
 
-            // --- DOM ELEMENT REFERENCES ---
-            let mainPage, settingsPage, goToSettingsButton, backButton,
-                tickerInput, fetchButton, statusMessage, settingsStatusMessage,
-                insightsModal, qualityScreenButton,
-                discountRateInput, terminalGrowthInput, fairValueInput, timePeriodSelector,
-                priceChartContainer, priceCanvas, priceCtx, macdChartContainer, macdCanvas, macdCtx,
-                deleteDataButton;
-                
-            document.addEventListener('DOMContentLoaded', () => {
-                // Assign all DOM elements
-                mainPage = document.getElementById('mainPage');
-                settingsPage = document.getElementById('settingsPage');
-                goToSettingsButton = document.getElementById('goToSettingsButton');
-                backButton = document.getElementById('backButton');
-                tickerInput = document.getElementById('tickerInput');
-                fetchButton = document.getElementById('fetchButton');
-                statusMessage = document.getElementById('statusMessage');
-                settingsStatusMessage = document.getElementById('settingsStatusMessage');
-                insightsModal = document.getElementById('insightsModal');
-                qualityScreenButton = document.getElementById('qualityScreenButton');
-                discountRateInput = document.getElementById('discountRateInput');
-                terminalGrowthInput = document.getElementById('terminalGrowthInput');
-                fairValueInput = document.getElementById('fairValueInput');
-                timePeriodSelector = document.getElementById('timePeriodSelector');
-                priceChartContainer = document.getElementById('priceChartContainer');
-                priceCanvas = document.getElementById('priceChart');
-                priceCtx = priceCanvas.getContext('2d');
-                macdChartContainer = document.getElementById('macdChartContainer');
-                macdCanvas = document.getElementById('macdChart');
-                macdCtx = macdCanvas.getContext('2d');
-                deleteDataButton = document.getElementById('deleteDataButton');
-
-                // --- EVENT LISTENERS ---
-                goToSettingsButton.addEventListener('click', () => {
-                    mainPage.style.display = 'none';
-                    settingsPage.style.display = 'flex';
-                    fairValueInput.value = fairValue ? `$${fairValue.toFixed(2)}` : 'N/A';
-                });
-                backButton.addEventListener('click', () => {
-                    mainPage.style.display = 'flex';
-                    settingsPage.style.display = 'none';
-                });
-                
-                fetchButton.addEventListener('click', fetchData);
-                tickerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') fetchData(); });
-                qualityScreenButton.addEventListener('click', () => alert("Quality Screen not implemented yet."));
-                
-                deleteDataButton.addEventListener('click', () => {
-                    if (confirm("Are you sure? This will delete all saved app data.")) {
-                        localStorage.clear();
-                        loadSettings(); // Reload defaults
-                        settingsStatusMessage.textContent = 'All data cleared.';
-                        setTimeout(() => { settingsStatusMessage.textContent = ''; }, 3000);
-                    }
-                });
-                discountRateInput.addEventListener('change', saveSettings);
-                terminalGrowthInput.addEventListener('change', saveSettings);
-                timePeriodSelector.addEventListener('change', () => {
-                    saveSettings();
-                    processAndDraw();
-                });
-
-                // Burger Menu
-                const burger = document.querySelector('.navbar-burger');
-                const menu = document.getElementById(burger.dataset.target);
-                burger.addEventListener('click', () => { burger.classList.toggle('is-active'); menu.classList.toggle('is-active'); });
-
-                // --- INITIALIZATION ---
-                setupPWA();
-                loadSettings();
-                const lastTicker = localStorage.getItem(LAST_TICKER_KEY);
-                if (lastTicker) { tickerInput.value = lastTicker; }
-                fetchData();
+            backButton.addEventListener('click', () => {
+                mainPage.style.display = 'flex';
+                settingsPage.style.display = 'none';
             });
             
-            // --- CORS PROXY MANAGEMENT ---
-            function getProxyUrl(targetUrl) {
-                return `${PROXIES[currentProxyIndex]}${encodeURIComponent(targetUrl)}`;
-            }
-            function rotateProxy() {
-                currentProxyIndex = (currentProxyIndex + 1) % PROXIES.length;
-                console.log("CORS Proxy failed, rotating to:", PROXIES[currentProxyIndex]);
-            }
-
-            // --- SETTINGS MANAGEMENT ---
-            function saveSettings() {
-                const settings = {
-                    discountRate: discountRateInput.value,
-                    terminalGrowth: terminalGrowthInput.value,
-                    timePeriod: timePeriodSelector.value
-                };
-                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-                if (settingsPage.style.display === 'flex') {
-                    settingsStatusMessage.textContent = 'Settings saved.';
-                    setTimeout(() => { settingsStatusMessage.textContent = ''; }, 2000);
+            // --- Mobile Menu (Burger) ---
+            burger.addEventListener('click', () => {
+                burger.classList.toggle('is-active');
+                menu.classList.toggle('is-active');
+            });
+            
+            // --- Placeholder for 'Delete Data' Button ---
+            const deleteDataButton = document.getElementById('deleteDataButton');
+            deleteDataButton.addEventListener('click', () => {
+                if (confirm("Are you sure you want to delete all saved app data?")) {
+                    console.log("Data would be cleared here.");
+                    alert("App data has been cleared.");
                 }
-            }
-            function loadSettings() {
-                const savedSettings = localStorage.getItem(SETTINGS_KEY);
-                if (savedSettings) {
-                    const settings = JSON.parse(savedSettings);
-                    discountRateInput.value = settings.discountRate || '9.5';
-                    terminalGrowthInput.value = settings.terminalGrowth || '2.5';
-                    timePeriodSelector.value = settings.timePeriod || '5yr';
+            });
+
+            // --- Placeholder for 'Fetch' Button ---
+            const fetchButton = document.getElementById('fetchButton');
+            fetchButton.addEventListener('click', () => {
+                const ticker = document.getElementById('tickerInput').value;
+                if(ticker){
+                    alert(`Fetching data for: ${ticker}`);
+                    console.log(`Fetching data for: ${ticker}`);
+                } else {
+                    alert("Please enter a ticker symbol.");
                 }
-            }
-            
-            // --- CORE APP LOGIC ---
-            function setupPWA() { if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered'), err => console.log('SW registration failed: ', err)); }); } }
-            
-            async function fetchData() {
-                fairValue = null;
-                const ticker = tickerInput.value.trim().toUpperCase();
-                if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
-                statusMessage.textContent = `Fetching data for ${ticker}...`;
-                clearCharts();
-                try {
-                    const [priceData, fundamentalData] = await Promise.all([
-                        fetchPriceData(ticker),
-                        fetchAndParseFundamentals(ticker.split('.')[0])
-                    ]);
-
-                    allDates = priceData.dates;
-                    allPrices = priceData.prices;
-                    
-                    if (fundamentalData) {
-                        const discountRate = parseFloat(discountRateInput.value) / 100;
-                        const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
-                        fairValue = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
-                    }
-                    
-                    localStorage.setItem(LAST_TICKER_KEY, ticker);
-                    statusMessage.textContent = `Displaying ${ticker}`;
-                    processAndDraw();
-
-                } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error details:", error); }
-            }
-            
-            async function fetchWithProxy(targetUrl, isRetry = false) {
-                try {
-                    const proxyUrl = getProxyUrl(targetUrl);
-                    const response = await fetch(proxyUrl);
-                    if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
-                    return response;
-                } catch (e) {
-                    if (!isRetry) {
-                        rotateProxy();
-                        return fetchWithProxy(targetUrl, true); // Retry once with the new proxy
-                    }
-                    throw e; // I retry also fails, throw the error
-                }
-            }
-
-            async function fetchPriceData(ticker) {
-                const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`;
-                const response = await fetchWithProxy(stooqUrl);
-                const rawData = await response.text();
-                if (rawData.trim().startsWith('<') || !rawData.toUpperCase().includes('DATE')) throw new Error('Invalid price data or ticker not found.');
-                
-                const lines = rawData.trim().split('\n');
-                const headerLine = lines.shift(), delimiter = headerLine.includes(';') ? ';' : ',', headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
-                const dateIndex = headers.indexOf('DATE'), closeIndex = headers.indexOf('CLOSE');
-                if (dateIndex === -1 || closeIndex === -1) throw new Error('Could not find "DATE" or "CLOSE" columns.');
-                const dates = [], prices = [];
-                lines.forEach(line => { const columns = line.split(delimiter); if (columns.length > Math.max(dateIndex, closeIndex)) { const dateStr = columns[dateIndex], closePrice = parseFloat(columns[closeIndex]); if (dateStr && !isNaN(closePrice)) { dates.push(dateStr); prices.push(closePrice); } } });
-                if (prices.length === 0) throw new Error("No valid price data rows found.");
-                return { dates, prices };
-            }
-
-            async function fetchAndParseFundamentals(tickerSymbol) {
-                 if (!tickerSymbol) return null;
-                try {
-                    const targetUrl = `https://finviz.com/quote.ashx?t=${tickerSymbol}`;
-                    const response = await fetchWithProxy(targetUrl);
-                    const html = await response.text();
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, "text/html");
-                    const data = {};
-                    doc.querySelectorAll('.snapshot-table2 td').forEach((cell, i) => { if (i % 2 === 0) { const key = cell.textContent.trim(); if (doc.querySelectorAll('.snapshot-table2 td')[i+1]) { data[key] = doc.querySelectorAll('.snapshot-table2 td')[i+1].textContent.trim(); } } });
-                    const epsTTM = parseFloat(data['EPS (ttm)']);
-                    const epsNext5Y = parseFloat(data['EPS next 5Y']?.replace('%', ''));
-                    if (isNaN(epsTTM) || isNaN(epsNext5Y)) return null;
-                    return { epsTTM, epsNext5Y };
-                } catch (error) {
-                    console.error(`Fundamental data error for ${tickerSymbol}:`, error);
-                    return null;
-                }
-            }
-
-            function processAndDraw() { if (allPrices.length === 0) return; const fastPeriod = 10, slowPeriod = 20; const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), ...calculateMACD(allPrices) }; const startIndex = getFilterStartIndex(); const dates = allDates.slice(startIndex); const prices = allPrices.slice(startIndex); const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) }; if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data for selected time period."; return; } drawPriceChart(dates, prices, sliced); drawMacdChart(dates, prices, sliced); }
-            
-            function clearCharts() { if(priceCtx) priceCtx.clearRect(0, 0, priceCanvas.width, priceCanvas.height); if(macdCtx) macdCtx.clearRect(0, 0, macdCanvas.width, macdCanvas.height); }
-            function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { let pvSum = 0; let currentEps = eps; for (let i = 1; i <= 5; i++) { currentEps *= (1 + growthRate5Y); pvSum += currentEps / Math.pow(1 + discountRate, i); } const terminalEps = currentEps * (1 + terminalGrowthRate); const terminalValue = terminalEps / (discountRate - terminalGrowthRate); const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5); return pvSum + pvTerminalValue; }
-            function getFilterStartIndex() { const period = timePeriodSelector.value, totalPoints = allDates.length; const weeksInYear = 52; if (period === 'all') return 0; if (period === '10yr') return Math.max(0, totalPoints - (10 * weeksInYear)); if (period === '7yr') return Math.max(0, totalPoints - (7 * weeksInYear)); if (period === '5yr') return Math.max(0, totalPoints - (5 * weeksInYear)); if (period === '3yr') return Math.max(0, totalPoints - (3 * weeksInYear)); if (period === '1yr') return Math.max(0, totalPoints - (1 * weeksInYear)); return 0; }
-            function calculateEMA(data, period) { if (!data || data.length < period) return new Array(data.length).fill(null); const k = 2 / (period + 1); const ema = new Array(data.length).fill(null); let sum = 0; for (let i = 0; i < period; i++) sum += data[i]; ema[period - 1] = sum / period; for (let i = period; i < data.length; i++) { if (ema[i-1] !== null) { ema[i] = (data[i] * k) + (ema[i - 1] * (1 - k)); } } return ema; }
-            function calculateMACD(data, p12=12, p26=26, pSignal=9) { const ema12 = calculateEMA(data, p12); const ema26 = calculateEMA(data, p26); const macdLine = ema26.map((v, i) => v !== null && ema12[i] !== null ? ema12[i] - v : null); const signalLine = calculateEMA(macdLine, pSignal); const histogram = signalLine.map((v, i) => v !== null && macdLine[i] !== null ? macdLine[i] - v : null); return { macdLine, signalLine, histogram }; }
-            
-            function drawPriceChart(dates, prices, slicedData) { const w = priceChartContainer.clientWidth, h = priceChartContainer.clientHeight; if (w <= 0 || h <= 0) return; priceCanvas.width = w * devicePixelRatio; priceCanvas.height = h * devicePixelRatio; priceCtx.scale(devicePixelRatio, devicePixelRatio); priceCtx.clearRect(0, 0, w, h); let allData = [...prices, ...slicedData.fastEma.filter(v=>v), ...slicedData.slowEma.filter(v=>v)]; if (fairValue !== null) allData.push(fairValue); if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; priceCtx.font = "12px sans-serif"; priceCtx.textAlign = 'right'; priceCtx.fillStyle = '#a0a0a0'; for (let i = 0; i <= 5; i++) { const val = minY + (i / 5) * (maxY - minY); const y = mapY(val); priceCtx.beginPath(); priceCtx.strokeStyle = '#444'; priceCtx.lineWidth = 0.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(margin.left + chartW, y); priceCtx.stroke(); priceCtx.fillText(val.toFixed(2), margin.left - 8, y + 4); } const xTickStep = Math.max(1, Math.floor(prices.length / Math.floor(chartW / 100))); for (let i = 0; i < prices.length; i += xTickStep) { priceCtx.textAlign = 'center'; priceCtx.fillText(dates[i], mapX(i), h - margin.bottom + 20); } drawLine(priceCtx, prices, mapX, mapY, '#a0a0a0', 1.5); drawLine(priceCtx, slicedData.fastEma, mapX, mapY, '#3273dc'); drawLine(priceCtx, slicedData.slowEma, mapX, mapY, '#23d160'); if (fairValue !== null && fairValue >= minY && fairValue <= maxY) { const y = mapY(fairValue); priceCtx.beginPath(); priceCtx.setLineDash([4, 4]); priceCtx.strokeStyle = '#ffd700'; priceCtx.lineWidth = 1.5; priceCtx.moveTo(margin.left, y); priceCtx.lineTo(w - margin.right, y); priceCtx.stroke(); priceCtx.setLineDash([]); priceCtx.font = "12px sans-serif"; priceCtx.fillStyle = '#ffd700'; priceCtx.textAlign = 'left'; priceCtx.fillText('Fair Value', w - margin.right + 5, y + 4); } const legX = margin.left + 10, legY = margin.top + 10, sp = 18; priceCtx.font = "14px sans-serif"; priceCtx.fillStyle = '#a0a0a0'; priceCtx.fillText('Price', legX, legY); priceCtx.fillStyle = '#3273dc'; priceCtx.fillText(`Fast EMA (10)`, legX, legY + sp); priceCtx.fillStyle = '#23d160'; priceCtx.fillText(`Slow EMA (20)`, legX, legY + sp * 2); }
-            function drawMacdChart(dates, prices, slicedData) { const { macdLine, signalLine, histogram } = slicedData; const w = macdChartContainer.clientWidth, h = macdChartContainer.clientHeight; if (w <= 0 || h <= 0) return; macdCanvas.width = w * devicePixelRatio; macdCanvas.height = h * devicePixelRatio; macdCtx.scale(devicePixelRatio, devicePixelRatio); macdCtx.clearRect(0, 0, w, h); const allData = [...macdLine.filter(v=>v), ...signalLine.filter(v=>v), ...histogram.filter(v=>v)]; if (allData.length === 0) return; const minY = Math.min(...allData), maxY = Math.max(...allData); const margin = { top: 20, right: 50, bottom: 40, left: 50 }; const chartW = w - margin.left - margin.right, chartH = h - margin.top - margin.bottom; const mapX = (i) => margin.left + (prices.length > 1 ? (i / (prices.length - 1)) * chartW : chartW / 2); const mapY = (v) => h - margin.bottom - ((v - minY) / (maxY - minY)) * chartH; const yZero = mapY(0); macdCtx.beginPath(); macdCtx.strokeStyle = '#a0a0a0'; macdCtx.lineWidth = 1; macdCtx.moveTo(margin.left, yZero); macdCtx.lineTo(margin.left + chartW, yZero); macdCtx.stroke(); const barW = Math.max(1, chartW / prices.length * 0.8); for(let i = 0; i < histogram.length; i++) { if(histogram[i] !== null) { const x = mapX(i) - barW / 2, y = mapY(histogram[i]); macdCtx.fillStyle = histogram[i] > 0 ? 'rgba(35, 209, 96, 0.7)' : 'rgba(255, 56, 96, 0.7)'; macdCtx.fillRect(x, y, barW, yZero - y); } } drawLine(macdCtx, macdLine, mapX, mapY, '#007bff'); drawLine(macdCtx, signalLine, mapX, mapY, '#fd7e14'); const legX = margin.left + 10, legY = margin.top + 10, sp = 18; macdCtx.font = "14px sans-serif"; macdCtx.fillStyle = '#007bff'; macdCtx.fillText('MACD Line', legX, legY); macdCtx.fillStyle = '#fd7e14'; macdCtx.fillText('Signal Line', legX, legY + sp); }
-            const drawLine = (ctx, data, mapX, mapY, color, lineWidth = 1.5) => { ctx.beginPath(); ctx.lineWidth = lineWidth; ctx.strokeStyle = color; let first = true; for (let i = 0; i < data.length; i++) { if (data[i] !== null) { const x = mapX(i); const y = mapY(data[i]); if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); } } } ctx.stroke(); };
-
-        })();
+            });
+        });
     </script>
+
 </body>
 </html>
