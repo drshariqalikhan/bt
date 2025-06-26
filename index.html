@@ -36,7 +36,15 @@
         }
 
         html, body { background-color: var(--dark-bg-1); color: var(--light-text); overflow-x: hidden; }
-        .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); }
+        
+        .navbar {
+            background-color: var(--dark-bg-2);
+            border-bottom: 1px solid var(--dark-border);
+            /* --- FIX FOR NOTCH --- */
+            /* Pushes the navbar content down from under the notch/status bar */
+            padding-top: env(safe-area-inset-top);
+        }
+
         .navbar-item, .navbar-link { color: var(--light-text); }
         .navbar-item:hover, .navbar-link:hover { background-color: var(--dark-bg-1); color: var(--info-color); }
         .section { padding: 1.5rem; }
@@ -63,7 +71,7 @@
         .centered-cell { text-align: center; }
 
         #chart-page { padding: 1rem; }
-        .chart-container { display: flex; flex-direction: column; height: calc(100vh - 120px); gap: 1rem; }
+        .chart-container { display: flex; flex-direction: column; height: calc(100vh - 120px - env(safe-area-inset-top)); gap: 1rem; }
         .chart-wrapper { position: relative; background-color: var(--dark-bg-2); border-radius: 6px; }
         #price-chart-wrapper { flex: 3; }
         #macd-chart-wrapper { flex: 1; }
@@ -81,30 +89,11 @@
     <section id="settings-page" class="section">
         <div class="container">
             <h1 class="title" style="color: var(--light-text);">Settings</h1>
-            
             <h2 class="subtitle mt-5" style="color: var(--light-text);">Fair Value Settings</h2>
             <div class="field"><label for="discount-rate-input" class="label" style="color: var(--light-text);">Discount Rate (%)</label><div class="control"><input id="discount-rate-input" class="input" type="number" step="0.1" placeholder="e.g., 9.5"></div></div>
             <div class="field"><label for="terminal-growth-input" class="label" style="color: var(--light-text);">Terminal Growth Rate (%)</label><div class="control"><input id="terminal-growth-input" class="input" type="number" step="0.1" placeholder="e.g., 2.5"></div></div>
-
-            <!-- NEW: Chart Settings Section -->
             <h2 class="subtitle mt-5" style="color: var(--light-text);">Chart Settings</h2>
-            <div class="field">
-                <label for="time-period-selector" class="label" style="color: var(--light-text);">Default Chart Time Period</label>
-                <div class="control">
-                    <div class="select is-fullwidth">
-                        <select id="time-period-selector">
-                            <option value="mtd">Month to Date</option>
-                            <option value="ytd">Year to Date</option>
-                            <option value="1y" selected>1 Year</option>
-                            <option value="3y">3 Years</option>
-                            <option value="5y">5 Years</option>
-                            <option value="7y">7 Years</option>
-                            <option value="all">All Time</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
+            <div class="field"><label for="time-period-selector" class="label" style="color: var(--light-text);">Default Chart Time Period</label><div class="control"><div class="select is-fullwidth"><select id="time-period-selector"><option value="mtd">Month to Date</option><option value="ytd">Year to Date</option><option value="1y" selected>1 Year</option><option value="3y">3 Years</option><option value="5y">5 Years</option><option value="7y">7 Years</option><option value="all">All Time</option></select></div></div></div>
             <div class="field mt-6"><div class="control"><button id="save-settings-button" class="button is-info is-fullwidth">Save & Return</button></div></div>
         </div>
     </section>
@@ -133,7 +122,7 @@
     const chartPage = document.getElementById('chart-page');
     const discountRateInput = document.getElementById('discount-rate-input');
     const terminalGrowthInput = document.getElementById('terminal-growth-input');
-    const timePeriodSelector = document.getElementById('time-period-selector'); // NEW
+    const timePeriodSelector = document.getElementById('time-period-selector');
     const backToMainButton = document.getElementById('back-to-main-button');
     const chartTitle = document.getElementById('chart-title');
     const chartStatus = document.getElementById('chart-status');
@@ -144,7 +133,7 @@
     const CORS_PROXY = "https://api.allorigins.win/raw?url=";
     let currentDiscountRate = 9.5;
     let currentTerminalGrowthRate = 2.5;
-    let currentChartPeriod = '1y'; // NEW
+    let currentChartPeriod = '1y';
     let priceChartInstance = null;
     let macdChartInstance = null;
 
@@ -158,16 +147,12 @@
     tableBody.addEventListener('click', handleTableClick);
 
     function initialize() {
-        // Load DCF settings
         const savedDiscount = localStorage.getItem('dcfDiscountRate');
         const savedTerminal = localStorage.getItem('dcfTerminalGrowthRate');
         if (savedDiscount) currentDiscountRate = parseFloat(savedDiscount);
         if (savedTerminal) currentTerminalGrowthRate = parseFloat(savedTerminal);
-
-        // NEW: Load Chart Period setting
         const savedPeriod = localStorage.getItem('chartTimePeriod');
         if (savedPeriod) currentChartPeriod = savedPeriod;
-        
         Chart.defaults.color = 'rgba(240, 240, 240, 0.7)';
         Chart.defaults.borderColor = 'rgba(68, 68, 68, 0.5)';
         loadHoldings();
@@ -178,13 +163,12 @@
     function showSettingsPage() {
         discountRateInput.value = currentDiscountRate;
         terminalGrowthInput.value = currentTerminalGrowthRate;
-        timePeriodSelector.value = currentChartPeriod; // NEW
+        timePeriodSelector.value = currentChartPeriod;
         mainPage.style.display = 'none';
         chartPage.style.display = 'none';
         settingsPage.style.display = 'block';
     }
     function saveSettingsAndReturn() {
-        // Save DCF
         const newDiscount = parseFloat(discountRateInput.value);
         const newTerminal = parseFloat(terminalGrowthInput.value);
         if (!isNaN(newDiscount) && !isNaN(newTerminal)) {
@@ -193,10 +177,8 @@
             localStorage.setItem('dcfDiscountRate', currentDiscountRate);
             localStorage.setItem('dcfTerminalGrowthRate', currentTerminalGrowthRate);
         }
-        // NEW: Save Chart Period
         currentChartPeriod = timePeriodSelector.value;
         localStorage.setItem('chartTimePeriod', currentChartPeriod);
-
         showMainPage();
         loadHoldings();
     }
@@ -210,22 +192,10 @@
         try {
             const fullHistoricalData = await fetchStooqData(data.ticker);
             chartStatus.textContent = '';
-            
-            // Calculate indicators on the FULL dataset first
             const prices = fullHistoricalData.prices;
-            const indicators = {
-                ema10: calculateEMA(prices, 10),
-                ema20: calculateEMA(prices, 20),
-                sma50: calculateSMA(prices, 50),
-                sma100: calculateSMA(prices, 100),
-                ...calculateMACD(prices)
-            };
-
-            // NEW: Filter all data arrays based on the selected period
+            const indicators = { ema10: calculateEMA(prices, 10), ema20: calculateEMA(prices, 20), sma50: calculateSMA(prices, 50), sma100: calculateSMA(prices, 100), ...calculateMACD(prices) };
             const chartData = filterDataByPeriod({ ...fullHistoricalData, ...indicators }, currentChartPeriod);
-            
             drawCharts(chartData, data);
-
         } catch (error) {
             chartStatus.textContent = `Error fetching chart data: ${error.message}`;
             console.error(error);
@@ -246,65 +216,39 @@
         }
     }
 
-    async function refreshSingleRow(ticker, row) { /* ... unchanged ... */ const cells=row.cells;[1,2,4,5,6].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[3].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';} }
-    async function loadHoldings() { /* ... unchanged ... */ tableBody.innerHTML='';statusMessage.textContent='Fetching top 30 holdings...';try{const holdings=await fetchTopHoldings();statusMessage.textContent=`Found ${holdings.length} holdings. Fetching data...`;for(const holding of holdings){processHolding(holding);}statusMessage.textContent='All data loaded. Click Refresh for all, or a ticker for one.';}catch(error){console.error('Failed to load holdings:',error);statusMessage.textContent=`Error: ${error.message}`;}}
-    async function fetchTopHoldings() { /* ... unchanged ... */ const url='https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error(`Network error: ${response.statusText}`);const csvData=await response.text();const lines=csvData.trim().split('\n');const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));if(dataStartIndex===-1)throw new Error("Could not find holdings data.");const holdingsData=lines.slice(dataStartIndex+1,dataStartIndex+31);return holdingsData.map(line=>{const columns=line.split(',');const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null;return{ticker:baseTicker};}).filter(h=>h.ticker); }
-    async function processHolding(holding) { /* ... unchanged ... */ if(!holding.ticker)return;const row=document.createElement('tr');row.innerHTML=`<td><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;tableBody.appendChild(row);try{const data=await fetchFinancialDataFromFinviz(holding.ticker);updateRowWithData(row,data);}catch(error){console.error(`Error processing ${holding.ticker}:`,error);row.cells[1].textContent='Error';}}
-    function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) { /* ... unchanged ... */ const cells=row.cells;[1,2,3,4,5,6].forEach(i=>{cells[i].className='';cells[i].innerHTML='';});cells[3].classList.add('centered-cell');cells[5].classList.add('centered-cell');cells[6].classList.add('centered-cell');cells[1].textContent=currentPrice!==null?`$${currentPrice.toFixed(2)}`:'N/A';cells[2].textContent=fairValue!==null?`$${fairValue.toFixed(2)}`:'N/A';cells[4].textContent=fiftyTwoWeekLow!==null?`$${fiftyTwoWeekLow.toFixed(2)}`:'N/A';if(currentPrice!==null&&fairValue!==null&&fairValue>0){const level1=fairValue*1.15,level2=fairValue*1.30;let lightClass='';if(currentPrice>level2)lightClass='light-red';else if(currentPrice>level1)lightClass='light-yellow';else if(currentPrice>=fairValue)lightClass='light-white';else lightClass='light-blue';cells[3].innerHTML=`<span class="traffic-light ${lightClass}"></span>`;if(fairValue>currentPrice*1.1)cells[2].classList.add('price-up');else if(currentPrice>fairValue*1.1)cells[2].classList.add('price-down');}else{cells[3].textContent='–';}const buyLevels=calculateBuyLevels({fairValue,fiftyTwoWeekLow});if(buyLevels){cells[5].innerHTML=`$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`;}else{cells[5].textContent='N/A';}const chartInfo={ticker,fairValue,buyLevels};cells[6].innerHTML=`<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;}
-    function calculateBuyLevels({ fairValue, fiftyTwoWeekLow }) { /* ... unchanged ... */ if(fairValue===null||fiftyTwoWeekLow===null){return null;}const sdProxyPercentage=0.10;let level1,level2,level3;if(fairValue>fiftyTwoWeekLow){const baseValue=fiftyTwoWeekLow;const step=baseValue*sdProxyPercentage;level1=baseValue+step;level2=baseValue;level3=baseValue-step;}else{const baseValue=fairValue;const step=baseValue*sdProxyPercentage;level1=baseValue;level2=baseValue-step;level3=baseValue-(2*step);}return{level1,level2,level3}; }
-    async function fetchFinancialDataFromFinviz(ticker) { /* ... returns { ticker, currentPrice, fairValue, fiftyTwoWeekLow } ... */ const targetUrl=`https://finviz.com/quote.ashx?t=${ticker}`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(targetUrl)}`;try{const response=await fetch(proxyUrl);if(!response.ok)return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};const html=await response.text();const parser=new DOMParser();const doc=parser.parseFromString(html,"text/html");const data={};doc.querySelectorAll('.snapshot-table2 td').forEach((cell,i)=>{if(i%2===0){const key=cell.textContent.trim();const valueCell=doc.querySelectorAll('.snapshot-table2 td')[i+1];if(valueCell)data[key]=valueCell.textContent.trim();}});const currentPriceText=data['Price'];const currentPrice=currentPriceText?parseFloat(currentPriceText):null;const epsTTM=parseFloat(data['EPS (ttm)']);const epsNext5Y=parseFloat(data['EPS next 5Y']?.replace('%',''));let fairValue=null;if(!isNaN(epsTTM)&&!isNaN(epsNext5Y)){fairValue=calculateDCF(epsTTM,epsNext5Y/100,currentTerminalGrowthRate/100,currentDiscountRate/100);}let fiftyTwoWeekLow=null;const low52WText=data['52W Low'];if(low52WText){fiftyTwoWeekLow=parseFloat(low52WText.replace('%',''));}return{ticker,currentPrice:isNaN(currentPrice)?null:currentPrice,fairValue:fairValue,fiftyTwoWeekLow:isNaN(fiftyTwoWeekLow)?null:fiftyTwoWeekLow};}catch(error){console.error(`Finviz fetch error for ${ticker}:`,error);return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};} }
-    function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { /* ... unchanged ... */ if(discountRate<=terminalGrowthRate)return null;let pvSum=0;let currentEps=eps;for(let i=1;i<=5;i++){currentEps*=(1+growthRate5Y);pvSum+=currentEps/Math.pow(1+discountRate,i);}const terminalEps=currentEps*(1+terminalGrowthRate);const terminalValue=terminalEps/(discountRate-terminalGrowthRate);const pvTerminalValue=terminalValue/Math.pow(1+discountRate,5);return pvSum+pvTerminalValue; }
+    async function refreshSingleRow(ticker, row) { const cells=row.cells;[1,2,4,5,6].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[3].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';} }
+    async function loadHoldings() { tableBody.innerHTML='';statusMessage.textContent='Fetching top 30 holdings...';try{const holdings=await fetchTopHoldings();statusMessage.textContent=`Found ${holdings.length} holdings. Fetching data...`;for(const holding of holdings){processHolding(holding);}statusMessage.textContent='All data loaded. Click Refresh for all, or a ticker for one.';}catch(error){console.error('Failed to load holdings:',error);statusMessage.textContent=`Error: ${error.message}`;}}
+    async function fetchTopHoldings() { const url='https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error(`Network error: ${response.statusText}`);const csvData=await response.text();const lines=csvData.trim().split('\n');const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));if(dataStartIndex===-1)throw new Error("Could not find holdings data.");const holdingsData=lines.slice(dataStartIndex+1,dataStartIndex+31);return holdingsData.map(line=>{const columns=line.split(',');const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null;return{ticker:baseTicker};}).filter(h=>h.ticker); }
+    async function processHolding(holding) { if(!holding.ticker)return;const row=document.createElement('tr');row.innerHTML=`<td><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;tableBody.appendChild(row);try{const data=await fetchFinancialDataFromFinviz(holding.ticker);updateRowWithData(row,data);}catch(error){console.error(`Error processing ${holding.ticker}:`,error);row.cells[1].textContent='Error';}}
+    function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) { const cells=row.cells;[1,2,3,4,5,6].forEach(i=>{cells[i].className='';cells[i].innerHTML='';});cells[3].classList.add('centered-cell');cells[5].classList.add('centered-cell');cells[6].classList.add('centered-cell');cells[1].textContent=currentPrice!==null?`$${currentPrice.toFixed(2)}`:'N/A';cells[2].textContent=fairValue!==null?`$${fairValue.toFixed(2)}`:'N/A';cells[4].textContent=fiftyTwoWeekLow!==null?`$${fiftyTwoWeekLow.toFixed(2)}`:'N/A';if(currentPrice!==null&&fairValue!==null&&fairValue>0){const level1=fairValue*1.15,level2=fairValue*1.30;let lightClass='';if(currentPrice>level2)lightClass='light-red';else if(currentPrice>level1)lightClass='light-yellow';else if(currentPrice>=fairValue)lightClass='light-white';else lightClass='light-blue';cells[3].innerHTML=`<span class="traffic-light ${lightClass}"></span>`;if(fairValue>currentPrice*1.1)cells[2].classList.add('price-up');else if(currentPrice>fairValue*1.1)cells[2].classList.add('price-down');}else{cells[3].textContent='–';}const buyLevels=calculateBuyLevels({fairValue,fiftyTwoWeekLow});if(buyLevels){cells[5].innerHTML=`$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`;}else{cells[5].textContent='N/A';}const chartInfo={ticker,fairValue,buyLevels};cells[6].innerHTML=`<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;}
+    function calculateBuyLevels({ fairValue, fiftyTwoWeekLow }) { if(fairValue===null||fiftyTwoWeekLow===null){return null;}const sdProxyPercentage=0.10;let level1,level2,level3;if(fairValue>fiftyTwoWeekLow){const baseValue=fiftyTwoWeekLow;const step=baseValue*sdProxyPercentage;level1=baseValue+step;level2=baseValue;level3=baseValue-step;}else{const baseValue=fairValue;const step=baseValue*sdProxyPercentage;level1=baseValue;level2=baseValue-step;level3=baseValue-(2*step);}return{level1,level2,level3}; }
+    async function fetchFinancialDataFromFinviz(ticker) { const targetUrl=`https://finviz.com/quote.ashx?t=${ticker}`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(targetUrl)}`;try{const response=await fetch(proxyUrl);if(!response.ok)return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};const html=await response.text();const parser=new DOMParser();const doc=parser.parseFromString(html,"text/html");const data={};doc.querySelectorAll('.snapshot-table2 td').forEach((cell,i)=>{if(i%2===0){const key=cell.textContent.trim();const valueCell=doc.querySelectorAll('.snapshot-table2 td')[i+1];if(valueCell)data[key]=valueCell.textContent.trim();}});const currentPriceText=data['Price'];const currentPrice=currentPriceText?parseFloat(currentPriceText):null;const epsTTM=parseFloat(data['EPS (ttm)']);const epsNext5Y=parseFloat(data['EPS next 5Y']?.replace('%',''));let fairValue=null;if(!isNaN(epsTTM)&&!isNaN(epsNext5Y)){fairValue=calculateDCF(epsTTM,epsNext5Y/100,currentTerminalGrowthRate/100,currentDiscountRate/100);}let fiftyTwoWeekLow=null;const low52WText=data['52W Low'];if(low52WText){fiftyTwoWeekLow=parseFloat(low52WText.replace('%',''));}return{ticker,currentPrice:isNaN(currentPrice)?null:currentPrice,fairValue:fairValue,fiftyTwoWeekLow:isNaN(fiftyTwoWeekLow)?null:fiftyTwoWeekLow};}catch(error){console.error(`Finviz fetch error for ${ticker}:`,error);return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};} }
+    function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { if(discountRate<=terminalGrowthRate)return null;let pvSum=0;let currentEps=eps;for(let i=1;i<=5;i++){currentEps*=(1+growthRate5Y);pvSum+=currentEps/Math.pow(1+discountRate,i);}const terminalEps=currentEps*(1+terminalGrowthRate);const terminalValue=terminalEps/(discountRate-terminalGrowthRate);const pvTerminalValue=terminalValue/Math.pow(1+discountRate,5);return pvSum+pvTerminalValue; }
 
     // --- Charting Logic ---
-    async function fetchStooqData(ticker) { /* ... unchanged ... */ const stooqTicker=`${ticker}.US`;const stooqUrl=`https://stooq.com/q/d/l/?s=${stooqTicker}&i=w`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error('Stooq network response was not ok.');const rawData=await response.text();if(!rawData||rawData.trim().startsWith('<'))throw new Error('Invalid data from Stooq (likely ticker not found).');const lines=rawData.trim().split('\n').slice(1);const dates=[],prices=[];lines.forEach(line=>{const cols=line.split(',');if(cols.length>=5){dates.push(cols[0]);prices.push(parseFloat(cols[4]));}});return{dates,prices};}
+    async function fetchStooqData(ticker) { const stooqTicker=`${ticker}.US`;const stooqUrl=`https://stooq.com/q/d/l/?s=${stooqTicker}&i=w`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error('Stooq network response was not ok.');const rawData=await response.text();if(!rawData||rawData.trim().startsWith('<'))throw new Error('Invalid data from Stooq (likely ticker not found).');const lines=rawData.trim().split('\n').slice(1);const dates=[],prices=[];lines.forEach(line=>{const cols=line.split(',');if(cols.length>=5){dates.push(cols[0]);prices.push(parseFloat(cols[4]));}});return{dates,prices};}
     function calculateSMA(data, period) { const sma=new Array(data.length).fill(null);if(data.length<period)return sma;let sum=data.slice(0,period).reduce((a,b)=>a+b,0);sma[period-1]=sum/period;for(let i=period;i<data.length;i++){sum=sum-data[i-period]+data[i];sma[i]=sum/period;}return sma; }
     function calculateEMA(data, period) { const ema=new Array(data.length).fill(null);if(data.length<period)return ema;const k=2/(period+1);let sum=data.slice(0,period).reduce((a,b)=>a+b,0);ema[period-1]=sum/period;for(let i=period;i<data.length;i++){if(ema[i-1]!==null){ema[i]=(data[i]*k)+(ema[i-1]*(1-k));}}return ema; }
     function calculateMACD(data, p12 = 12, p26 = 26, pSignal = 9) { const ema12=calculateEMA(data,p12);const ema26=calculateEMA(data,p26);const macdLine=ema26.map((v,i)=>v!==null&&ema12[i]!==null?ema12[i]-v:null);const signalLine=calculateEMA(macdLine,pSignal);const histogram=signalLine.map((v,i)=>v!==null&&macdLine[i]!==null?macdLine[i]-v:null);return{macdLine,signalLine,histogram}; }
 
-    // NEW: Function to filter data based on the selected time period
     function filterDataByPeriod(fullData, period) {
-        const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = fullData;
+        const { dates, ...rest } = fullData;
         const totalPoints = dates.length;
-        if (period === 'all' || totalPoints === 0) {
-            return fullData;
-        }
-
+        if (period === 'all' || totalPoints === 0) return fullData;
         let startIndex = 0;
         const weeksInYear = 52;
-        
         switch (period) {
             case '7y': startIndex = Math.max(0, totalPoints - (7 * weeksInYear)); break;
             case '5y': startIndex = Math.max(0, totalPoints - (5 * weeksInYear)); break;
             case '3y': startIndex = Math.max(0, totalPoints - (3 * weeksInYear)); break;
             case '1y': startIndex = Math.max(0, totalPoints - (1 * weeksInYear)); break;
-            case 'ytd': {
-                const now = new Date();
-                const startOfYear = new Date(now.getFullYear(), 0, 1);
-                const foundIndex = dates.findIndex(d => new Date(d) >= startOfYear);
-                startIndex = foundIndex !== -1 ? foundIndex : totalPoints;
-                break;
-            }
-            case 'mtd': {
-                const now = new Date();
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const foundIndex = dates.findIndex(d => new Date(d) >= startOfMonth);
-                startIndex = foundIndex !== -1 ? foundIndex : totalPoints;
-                break;
-            }
-            default: startIndex = Math.max(0, totalPoints - weeksInYear); // Default to 1 year
+            case 'ytd': { const now = new Date(), startOfYear = new Date(now.getFullYear(), 0, 1); const foundIndex = dates.findIndex(d => new Date(d) >= startOfYear); startIndex = foundIndex !== -1 ? foundIndex : totalPoints; break; }
+            case 'mtd': { const now = new Date(), startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); const foundIndex = dates.findIndex(d => new Date(d) >= startOfMonth); startIndex = foundIndex !== -1 ? foundIndex : totalPoints; break; }
+            default: startIndex = Math.max(0, totalPoints - weeksInYear);
         }
-
-        return {
-            dates: dates.slice(startIndex),
-            prices: prices.slice(startIndex),
-            ema10: ema10.slice(startIndex),
-            ema20: ema20.slice(startIndex),
-            sma50: sma50.slice(startIndex),
-            sma100: sma100.slice(startIndex),
-            macdLine: macdLine.slice(startIndex),
-            signalLine: signalLine.slice(startIndex),
-            histogram: histogram.slice(startIndex),
-        };
+        const slicedData = { dates: dates.slice(startIndex) };
+        for (const key in rest) { slicedData[key] = rest[key].slice(startIndex); }
+        return slicedData;
     }
 
     function destroyCharts() { if (priceChartInstance) { priceChartInstance.destroy(); priceChartInstance = null; } if (macdChartInstance) { macdChartInstance.destroy(); macdChartInstance = null; } }
