@@ -1,367 +1,337 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="has-navbar-fixed-top is-dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>QualityStock Screener</title>
-    
-    <meta name="theme-color" content="#1a1d21">
-    <meta name="mobile-web-app-capable" content="yes">
+    <title>ETF Holdings</title>
+
+    <!-- PWA and iPhone specific meta tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="QualityStock">
-
+    <meta name="apple-mobile-web-app-title" content="ETF Holdings">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+
+    <!-- Bulma CSS Framework -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css">
+    
+    <!-- Chart.js and Annotation Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
 
     <style>
-        :root { --dark-bg-1: #1a1d21; --dark-bg-2: #272a2e; --dark-border: #444; --light-text: #f0f0f0; --dim-text: #a0a0a0; }
-        html { background-color: var(--dark-bg-1); height: 100svh; }
-        body { background-color: var(--dark-bg-1); color: var(--light-text); display: flex; flex-direction: column; height: 100%; margin: 0; }
+        /* Dark Mode Theme */
+        :root {
+            --dark-bg-1: #1a1d21;
+            --dark-bg-2: #272a2e;
+            --dark-border: #444;
+            --light-text: #f0f0f0;
+            --dim-text: #a0a0a0;
+            --info-color: #3e8ed0;
+            --success-color: #48c78e;
+            --danger-color: #f14668;
+            --yellow-color: #fadd78;
+            --white-color: #f5f5f5;
+        }
+
+        html, body { background-color: var(--dark-bg-1); color: var(--light-text); overflow-x: hidden; }
         .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); }
-        .navbar-item, .navbar-link { color: var(--light-text); cursor: pointer; }
-        .navbar-burger span { background-color: var(--light-text); }
+        .navbar-item, .navbar-link { color: var(--light-text); }
+        .navbar-item:hover, .navbar-link:hover { background-color: var(--dark-bg-1); color: var(--info-color); }
+        .section { padding: 1.5rem; }
+        .table { background-color: var(--dark-bg-2); color: var(--light-text); }
+        .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; vertical-align: middle; white-space: nowrap; }
+        .table td:first-child { white-space: normal; }
+        .table.is-striped tbody tr:not(.is-selected):nth-child(even) { background-color: var(--dark-bg-1); }
+        .table thead th { color: var(--info-color) !important; }
+
+        #status-message { color: var(--dim-text); min-height: 24px; margin-bottom: 1rem; }
+        .price-up { color: var(--success-color); }
+        .price-down { color: var(--danger-color); }
+        .is-loading-cell { color: var(--dim-text); font-style: italic; }
+        .traffic-light { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--dim-text); vertical-align: middle; }
+        .light-red { background-color: var(--danger-color); }
+        .light-yellow { background-color: var(--yellow-color); }
+        .light-white { background-color: var(--white-color); }
+        .light-blue { background-color: var(--info-color); }
+        
+        #settings-page, #chart-page { display: none; }
         .input, .select select { background-color: var(--dark-bg-1); border-color: var(--dark-border); color: var(--light-text); }
-        .label { color: var(--light-text); }
-        .table { background-color: var(--dark-bg-1); color: var(--light-text); }
-        .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; vertical-align: middle; }
-        .table.is-striped tbody tr:not(.is-selected):nth-child(even) { background-color: var(--dark-bg-2); }
-        .table.is-hoverable tbody tr:hover { background-color: #363636 !important; }
+        .ticker-link { font-weight: bold; color: var(--info-color); text-decoration: none; }
+        .ticker-link:hover { text-decoration: underline; }
+        .centered-cell { text-align: center; }
 
-        .page { display: flex; flex-direction: column; height: 100%; width: 100%; }
-        #settingsPage, #qualityValuePage { display: none; }
-        .page-nav { padding-top: env(safe-area-inset-top); flex-shrink: 0; }
-        .page-content { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
-
-        #appContainer { display: flex; flex-direction: column; gap: 1rem; height: 100%; padding: 1rem; }
-        .chart-wrapper { background-color: var(--dark-bg-2); border-radius: 6px; flex: 1; position: relative; min-height: 200px; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-
-        .content-container { padding: 1.5rem; }
-        .settings-field { max-width: 400px; margin-bottom: 1.5rem; }
-        .upside-indicator { font-size: 1.5rem; line-height: 1; }
+        #chart-page { padding: 1rem; }
+        .chart-container { display: flex; flex-direction: column; height: calc(100vh - 120px); gap: 1rem; }
+        .chart-wrapper { position: relative; background-color: var(--dark-bg-2); border-radius: 6px; }
+        #price-chart-wrapper { flex: 3; }
+        #macd-chart-wrapper { flex: 1; }
     </style>
 </head>
 <body>
 
-    <!-- PAGE 1: MAIN PAGE -->
-    <div id="mainPage" class="page">
-        <nav class="navbar page-nav" role="navigation">
-            <div class="navbar-brand">
-                <a class="navbar-item has-text-weight-bold" id="goToQualityPageButton">Quality Screen</a>
-                <a role="button" class="navbar-burger" data-target="navbarBasicMenu"><span></span><span></span><span></span></a>
-            </div>
-            <div id="navbarBasicMenu" class="navbar-menu">
-                <div class="navbar-start">
-                    <div class="navbar-item"><div class="field is-grouped"><p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US"></p><p class="control"><button id="fetchButton" class="button is-info">Fetch</button></p></div></div>
-                    <a class="navbar-item" id="goToSettingsButton">Settings</a>
+    <!-- Navbar -->
+    <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation"><div class="navbar-brand"><a class="navbar-item has-text-weight-bold">IWQU Holdings</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu"><span></span><span></span><span></span></a></div><div id="navbarMenu" class="navbar-menu"><div class="navbar-end"><a class="navbar-item" id="refresh-button">Refresh</a><a class="navbar-item" id="settings-button">Settings</a></div></div></nav>
+
+    <!-- Main Content Page -->
+    <div id="main-content-page"><main class="section"><div class="container is-fluid"><div id="status-message" class="has-text-centered"></div><div class="table-container"><table class="table is-fullwidth is-striped is-hoverable"><thead><tr><th>Ticker</th><th>Current Price</th><th>Fair Value</th><th class="centered-cell">Valuation</th><th>52W Low</th><th class="centered-cell">Buy Levels</th><th class="centered-cell">Chart</th></tr></thead><tbody id="holdings-table-body"></tbody></table></div></div></main></div>
+
+    <!-- Settings Page -->
+    <section id="settings-page" class="section">
+        <div class="container">
+            <h1 class="title" style="color: var(--light-text);">Settings</h1>
+            
+            <h2 class="subtitle mt-5" style="color: var(--light-text);">Fair Value Settings</h2>
+            <div class="field"><label for="discount-rate-input" class="label" style="color: var(--light-text);">Discount Rate (%)</label><div class="control"><input id="discount-rate-input" class="input" type="number" step="0.1" placeholder="e.g., 9.5"></div></div>
+            <div class="field"><label for="terminal-growth-input" class="label" style="color: var(--light-text);">Terminal Growth Rate (%)</label><div class="control"><input id="terminal-growth-input" class="input" type="number" step="0.1" placeholder="e.g., 2.5"></div></div>
+
+            <!-- NEW: Chart Settings Section -->
+            <h2 class="subtitle mt-5" style="color: var(--light-text);">Chart Settings</h2>
+            <div class="field">
+                <label for="time-period-selector" class="label" style="color: var(--light-text);">Default Chart Time Period</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="time-period-selector">
+                            <option value="mtd">Month to Date</option>
+                            <option value="ytd">Year to Date</option>
+                            <option value="1y" selected>1 Year</option>
+                            <option value="3y">3 Years</option>
+                            <option value="5y">5 Years</option>
+                            <option value="7y">7 Years</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-        </nav>
-        <main class="page-content">
-            <div id="appContainer">
-                <div id="priceChartWrapper" class="chart-wrapper"><canvas id="priceChart"></canvas></div>
-                <div id="macdChartWrapper" class="chart-wrapper"><canvas id="macdChart"></canvas></div>
-                <div id="statusMessage" class="has-text-centered" role="status"></div>
-            </div>
-        </main>
-    </div>
 
-    <!-- PAGE 2: SETTINGS PAGE -->
-    <div id="settingsPage" class="page">
-        <nav class="navbar page-nav">
-            <div class="navbar-brand"><a class="navbar-item back-button">< Back</a></div>
-            <div class="navbar-menu is-active"><div class="navbar-start"><div class="navbar-item has-text-weight-bold">Settings</div></div></div>
-        </nav>
-        <main class="page-content"><div class="content-container" id="settingsContainer"></div></main>
-    </div>
+            <div class="field mt-6"><div class="control"><button id="save-settings-button" class="button is-info is-fullwidth">Save & Return</button></div></div>
+        </div>
+    </section>
 
-    <!-- PAGE 3: QUALITY VALUE PAGE -->
-    <div id="qualityValuePage" class="page">
-        <nav class="navbar page-nav">
-            <div class="navbar-brand"><a class="navbar-item back-button">< Back</a></div>
-            <div class="navbar-menu is-active"><div class="navbar-start"><div class="navbar-item has-text-weight-bold">Quality Stock Value</div></div></div>
-        </nav>
-        <main class="page-content">
-            <div class="content-container">
-                <table class="table is-fullwidth is-striped is-hoverable">
-                    <thead>
-                        <tr>
-                            <th>Ticker</th>
-                            <th>Fair Value</th>
-                            <th>Current Price</th>
-                            <th class="has-text-centered">Upside</th>
-                        </tr>
-                    </thead>
-                    <tbody id="qualityTableBody"></tbody>
-                </table>
-            </div>
-        </main>
-    </div>
+    <!-- Chart Page -->
+    <section id="chart-page" class="section">
+        <div class="level"><div class="level-left"><h1 id="chart-title" class="title" style="color: var(--light-text);">Chart</h1></div><div class="level-right"><button id="back-to-main-button" class="button is-light">Back to List</button></div></div>
+        <div id="chart-status" class="has-text-centered" style="color: var(--dim-text);"></div>
+        <div class="chart-container"><div id="price-chart-wrapper" class="chart-wrapper"><canvas id="price-chart"></canvas></div><div id="macd-chart-wrapper" class="chart-wrapper"><canvas id="macd-chart"></canvas></div></div>
+    </section>
 
-    <script>
-        (function() {
-            // --- SECTION 1: CONSTANTS AND STATE ---
-            const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-            const LAST_TICKER_KEY = 'qualitystock_lastTicker';
-            const SETTINGS_KEY = 'qualitystock_settings';
-            let allDates = [], allPrices = [];
-            let fairValue = null;
+<script>
+    // --- Service Worker Registration ---
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').then(reg => console.log('SW registered.', reg)).catch(err => console.log('SW registration failed: ', err)); }); }
 
-            // --- SECTION 2: DOM ELEMENT REFERENCES ---
-            let mainPage, settingsPage, qualityValuePage, goToSettingsButton, goToQualityPageButton,
-                tickerInput, fetchButton, timePeriodSelector,
-                priceCanvas, priceCtx, macdCanvas, macdCtx, statusMessage,
-                deleteDataButton, discountRateInput, terminalGrowthInput, fairValueInput,
-                qualityTableBody;
+    // --- DOM Elements ---
+    const tableBody = document.getElementById('holdings-table-body');
+    const statusMessage = document.getElementById('status-message');
+    const refreshButton = document.getElementById('refresh-button');
+    const settingsButton = document.getElementById('settings-button');
+    const saveSettingsButton = document.getElementById('save-settings-button');
+    const navbarBurger = document.querySelector('.navbar-burger');
+    const navbarMenu = document.getElementById('navbarMenu');
+    const mainPage = document.getElementById('main-content-page');
+    const settingsPage = document.getElementById('settings-page');
+    const chartPage = document.getElementById('chart-page');
+    const discountRateInput = document.getElementById('discount-rate-input');
+    const terminalGrowthInput = document.getElementById('terminal-growth-input');
+    const timePeriodSelector = document.getElementById('time-period-selector'); // NEW
+    const backToMainButton = document.getElementById('back-to-main-button');
+    const chartTitle = document.getElementById('chart-title');
+    const chartStatus = document.getElementById('chart-status');
+    const priceCanvas = document.getElementById('price-chart');
+    const macdCanvas = document.getElementById('macd-chart');
 
-            // --- SECTION 3: PRIMARY EVENT LISTENER ---
-            document.addEventListener('DOMContentLoaded', () => {
-                // Assign references
-                mainPage = document.getElementById('mainPage');
-                settingsPage = document.getElementById('settingsPage');
-                qualityValuePage = document.getElementById('qualityValuePage');
-                goToSettingsButton = document.getElementById('goToSettingsButton');
-                goToQualityPageButton = document.getElementById('goToQualityPageButton');
-                tickerInput = document.getElementById('tickerInput');
-                fetchButton = document.getElementById('fetchButton');
-                priceCanvas = document.getElementById('priceChart');
-                priceCtx = priceCanvas.getContext('2d');
-                macdCanvas = document.getElementById('macdChart');
-                macdCtx = macdCanvas.getContext('2d');
-                statusMessage = document.getElementById('statusMessage');
-                qualityTableBody = document.getElementById('qualityTableBody');
+    // --- State & Constants ---
+    const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+    let currentDiscountRate = 9.5;
+    let currentTerminalGrowthRate = 2.5;
+    let currentChartPeriod = '1y'; // NEW
+    let priceChartInstance = null;
+    let macdChartInstance = null;
 
-                // Page Navigation
-                const showPage = (pageId) => {
-                    document.querySelectorAll('.page').forEach(p => { p.style.display = 'none'; });
-                    document.getElementById(pageId).style.display = 'flex';
-                };
-                
-                goToSettingsButton.addEventListener('click', () => {
-                    fairValueInput.value = fairValue ? `$${fairValue.toFixed(2)}` : 'N/A';
-                    showPage('settingsPage');
-                });
-                goToQualityPageButton.addEventListener('click', () => {
-                    showPage('qualityValuePage');
-                    populateQualityValueTable();
-                });
-                document.querySelectorAll('.back-button').forEach(btn => {
-                    btn.addEventListener('click', () => showPage('mainPage'));
-                });
-                
-                const burger = document.querySelector('.navbar-burger');
-                const menu = document.getElementById(burger.dataset.target);
-                burger.addEventListener('click', () => { burger.classList.toggle('is-active'); menu.classList.toggle('is-active'); });
-                
-                fetchButton.addEventListener('click', fetchData);
-                tickerInput.addEventListener('keypress', e => { if (e.key === 'Enter') fetchData(); });
-                
-                buildSettingsPage();
+    // --- Event Listeners ---
+    document.addEventListener('DOMContentLoaded', initialize);
+    refreshButton.addEventListener('click', loadHoldings);
+    settingsButton.addEventListener('click', showSettingsPage);
+    saveSettingsButton.addEventListener('click', saveSettingsAndReturn);
+    backToMainButton.addEventListener('click', showMainPage);
+    navbarBurger.addEventListener('click', () => { navbarBurger.classList.toggle('is-active'); navbarMenu.classList.toggle('is-active'); });
+    tableBody.addEventListener('click', handleTableClick);
 
-                // App Initialization
-                loadSettings();
-                const lastTicker = localStorage.getItem(LAST_TICKER_KEY);
-                if (lastTicker) { tickerInput.value = lastTicker; }
-                fetchData();
-            });
+    function initialize() {
+        // Load DCF settings
+        const savedDiscount = localStorage.getItem('dcfDiscountRate');
+        const savedTerminal = localStorage.getItem('dcfTerminalGrowthRate');
+        if (savedDiscount) currentDiscountRate = parseFloat(savedDiscount);
+        if (savedTerminal) currentTerminalGrowthRate = parseFloat(savedTerminal);
+
+        // NEW: Load Chart Period setting
+        const savedPeriod = localStorage.getItem('chartTimePeriod');
+        if (savedPeriod) currentChartPeriod = savedPeriod;
+        
+        Chart.defaults.color = 'rgba(240, 240, 240, 0.7)';
+        Chart.defaults.borderColor = 'rgba(68, 68, 68, 0.5)';
+        loadHoldings();
+    }
+    
+    // --- Page Navigation ---
+    function showMainPage() { destroyCharts(); settingsPage.style.display = 'none'; chartPage.style.display = 'none'; mainPage.style.display = 'block'; }
+    function showSettingsPage() {
+        discountRateInput.value = currentDiscountRate;
+        terminalGrowthInput.value = currentTerminalGrowthRate;
+        timePeriodSelector.value = currentChartPeriod; // NEW
+        mainPage.style.display = 'none';
+        chartPage.style.display = 'none';
+        settingsPage.style.display = 'block';
+    }
+    function saveSettingsAndReturn() {
+        // Save DCF
+        const newDiscount = parseFloat(discountRateInput.value);
+        const newTerminal = parseFloat(terminalGrowthInput.value);
+        if (!isNaN(newDiscount) && !isNaN(newTerminal)) {
+            currentDiscountRate = newDiscount;
+            currentTerminalGrowthRate = newTerminal;
+            localStorage.setItem('dcfDiscountRate', currentDiscountRate);
+            localStorage.setItem('dcfTerminalGrowthRate', currentTerminalGrowthRate);
+        }
+        // NEW: Save Chart Period
+        currentChartPeriod = timePeriodSelector.value;
+        localStorage.setItem('chartTimePeriod', currentChartPeriod);
+
+        showMainPage();
+        loadHoldings();
+    }
+    async function showChartPage(data) {
+        mainPage.style.display = 'none';
+        settingsPage.style.display = 'none';
+        chartPage.style.display = 'block';
+        chartTitle.textContent = `${data.ticker} Chart`;
+        chartStatus.textContent = 'Fetching historical data...';
+
+        try {
+            const fullHistoricalData = await fetchStooqData(data.ticker);
+            chartStatus.textContent = '';
             
-            // --- SECTION 4: UI & SETTINGS MANAGEMENT ---
-            function buildSettingsPage() {
-                const container = document.getElementById('settingsContainer');
-                container.innerHTML = `
-                    <h2 class="title is-4 has-text-light">DCF Calculation</h2>
-                    <div class="field settings-field"><label class="label" for="discountRateInput">Discount Rate (%)</label><div class="control"><input class="input" type="number" id="discountRateInput" step="0.1"></div></div>
-                    <div class="field settings-field"><label class="label" for="terminalGrowthInput">Terminal Growth Rate (%)</label><div class="control"><input class="input" type="number" id="terminalGrowthInput" step="0.1"></div></div>
-                    <div class="field settings-field"><label class="label" for="fairValueInput">Last Calculated Fair Value</label><div class="control"><input class="input" type="text" id="fairValueInput" placeholder="N/A" readonly></div></div>
-                    <hr style="background-color: var(--dark-border);">
-                    <h2 class="title is-4 has-text-light">Chart Display</h2>
-                    <div class="field settings-field"><label class="label" for="timePeriodSelector">Time Period</label><div class="control"><div class="select is-fullwidth"><select id="timePeriodSelector"><option value="all">All Time</option><option value="10yr">10 Years</option><option value="5yr">5 Years</option><option value="1yr">1 Year</option></select></div></div></div>
-                    <hr style="background-color: var(--dark-border);">
-                    <h2 class="title is-4 has-text-light">App Data</h2>
-                    <div class="field"><div class="control"><button class="button is-danger" id="deleteDataButton">Clear All Saved Data</button></div><p class="help has-text-grey">This clears the last ticker and all saved settings.</p></div>`;
-                
-                timePeriodSelector = document.getElementById('timePeriodSelector');
-                discountRateInput = document.getElementById('discountRateInput');
-                terminalGrowthInput = document.getElementById('terminalGrowthInput');
-                fairValueInput = document.getElementById('fairValueInput');
-                deleteDataButton = document.getElementById('deleteDataButton');
+            // Calculate indicators on the FULL dataset first
+            const prices = fullHistoricalData.prices;
+            const indicators = {
+                ema10: calculateEMA(prices, 10),
+                ema20: calculateEMA(prices, 20),
+                sma50: calculateSMA(prices, 50),
+                sma100: calculateSMA(prices, 100),
+                ...calculateMACD(prices)
+            };
 
-                timePeriodSelector.addEventListener('change', () => { saveSettings(); processAndDraw(); });
-                discountRateInput.addEventListener('change', () => { saveSettings(); fetchData(); });
-                terminalGrowthInput.addEventListener('change', () => { saveSettings(); fetchData(); });
-                deleteDataButton.addEventListener('click', () => { if (confirm("Are you sure?")) { localStorage.clear(); loadSettings(); alert("Cleared saved data."); } });
-            }
-            function saveSettings() { const settings = { discountRate: discountRateInput.value, terminalGrowth: terminalGrowthInput.value, timePeriod: timePeriodSelector.value }; localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-            function loadSettings() {
-                const savedSettings = localStorage.getItem(SETTINGS_KEY);
-                const defaults = { discountRate: '9.5', terminalGrowth: '2.5', timePeriod: '5yr' };
-                if (savedSettings) {
-                    const settings = JSON.parse(savedSettings);
-                    discountRateInput.value = settings.discountRate || defaults.discountRate;
-                    terminalGrowthInput.value = settings.terminalGrowth || defaults.terminalGrowth;
-                    timePeriodSelector.value = settings.timePeriod || defaults.timePeriod;
-                } else {
-                    discountRateInput.value = defaults.discountRate;
-                    terminalGrowthInput.value = defaults.terminalGrowth;
-                    timePeriodSelector.value = defaults.timePeriod;
-                }
-            }
+            // NEW: Filter all data arrays based on the selected period
+            const chartData = filterDataByPeriod({ ...fullHistoricalData, ...indicators }, currentChartPeriod);
             
-            // --- SECTION 5: CORE LOGIC ---
-            async function populateQualityValueTable() {
-                qualityTableBody.innerHTML = `<tr><td colspan="4" class="has-text-centered">Fetching top 30 quality holdings...</td></tr>`;
-                try {
-                    const url = 'https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';
-                    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-                    const response = await fetch(proxyUrl);
-                    if (!response.ok) throw new Error(`Network Error fetching holdings`);
-                    
-                    const csvData = await response.text();
-                    const lines = csvData.trim().split('\n');
-                    const dataStartIndex = lines.findIndex(line => line.trim().toLowerCase().startsWith('ticker,'));
-                    if (dataStartIndex === -1) throw new Error("Could not find holdings data in CSV.");
+            drawCharts(chartData, data);
 
-                    const holdingsData = lines.slice(dataStartIndex + 1, dataStartIndex + 31);
-                    qualityTableBody.innerHTML = ''; 
-                    
-                    const rows = [];
-                    holdingsData.forEach(line => {
-                        const columns = line.split(',');
-                        const baseTicker = columns[0]?.replace(/"/g, '').split(' ')[0] || null;
-                        if (baseTicker) {
-                            const row = document.createElement('tr');
-                            row.style.cursor = 'pointer';
-                            row.dataset.ticker = `${baseTicker}.US`;
-                            row.innerHTML = `<td>${baseTicker}</td><td class="is-family-monospace has-text-centered">...</td><td class="is-family-monospace has-text-centered">...</td><td class="has-text-centered">...</td>`;
-                            qualityTableBody.appendChild(row);
-                            rows.push(row);
-                        }
-                    });
+        } catch (error) {
+            chartStatus.textContent = `Error fetching chart data: ${error.message}`;
+            console.error(error);
+        }
+    }
+    
+    // --- Main Table & Data Logic ---
+    function handleTableClick(event) {
+        const target = event.target;
+        if (target.matches('.ticker-link')) {
+            event.preventDefault();
+            const ticker = target.dataset.ticker;
+            const row = target.closest('tr');
+            if (ticker && row) refreshSingleRow(ticker, row);
+        } else if (target.matches('.chart-button')) {
+            const data = JSON.parse(target.dataset.chartInfo);
+            showChartPage(data);
+        }
+    }
 
-                    rows.forEach(row => processTableRow(row));
-                } catch (error) { qualityTableBody.innerHTML = `<tr><td colspan="4" class="has-text-centered has-text-danger">Error: ${error.message}</td></tr>`; }
+    async function refreshSingleRow(ticker, row) { /* ... unchanged ... */ const cells=row.cells;[1,2,4,5,6].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[3].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';} }
+    async function loadHoldings() { /* ... unchanged ... */ tableBody.innerHTML='';statusMessage.textContent='Fetching top 30 holdings...';try{const holdings=await fetchTopHoldings();statusMessage.textContent=`Found ${holdings.length} holdings. Fetching data...`;for(const holding of holdings){processHolding(holding);}statusMessage.textContent='All data loaded. Click Refresh for all, or a ticker for one.';}catch(error){console.error('Failed to load holdings:',error);statusMessage.textContent=`Error: ${error.message}`;}}
+    async function fetchTopHoldings() { /* ... unchanged ... */ const url='https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error(`Network error: ${response.statusText}`);const csvData=await response.text();const lines=csvData.trim().split('\n');const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));if(dataStartIndex===-1)throw new Error("Could not find holdings data.");const holdingsData=lines.slice(dataStartIndex+1,dataStartIndex+31);return holdingsData.map(line=>{const columns=line.split(',');const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null;return{ticker:baseTicker};}).filter(h=>h.ticker); }
+    async function processHolding(holding) { /* ... unchanged ... */ if(!holding.ticker)return;const row=document.createElement('tr');row.innerHTML=`<td><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;tableBody.appendChild(row);try{const data=await fetchFinancialDataFromFinviz(holding.ticker);updateRowWithData(row,data);}catch(error){console.error(`Error processing ${holding.ticker}:`,error);row.cells[1].textContent='Error';}}
+    function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) { /* ... unchanged ... */ const cells=row.cells;[1,2,3,4,5,6].forEach(i=>{cells[i].className='';cells[i].innerHTML='';});cells[3].classList.add('centered-cell');cells[5].classList.add('centered-cell');cells[6].classList.add('centered-cell');cells[1].textContent=currentPrice!==null?`$${currentPrice.toFixed(2)}`:'N/A';cells[2].textContent=fairValue!==null?`$${fairValue.toFixed(2)}`:'N/A';cells[4].textContent=fiftyTwoWeekLow!==null?`$${fiftyTwoWeekLow.toFixed(2)}`:'N/A';if(currentPrice!==null&&fairValue!==null&&fairValue>0){const level1=fairValue*1.15,level2=fairValue*1.30;let lightClass='';if(currentPrice>level2)lightClass='light-red';else if(currentPrice>level1)lightClass='light-yellow';else if(currentPrice>=fairValue)lightClass='light-white';else lightClass='light-blue';cells[3].innerHTML=`<span class="traffic-light ${lightClass}"></span>`;if(fairValue>currentPrice*1.1)cells[2].classList.add('price-up');else if(currentPrice>fairValue*1.1)cells[2].classList.add('price-down');}else{cells[3].textContent='–';}const buyLevels=calculateBuyLevels({fairValue,fiftyTwoWeekLow});if(buyLevels){cells[5].innerHTML=`$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`;}else{cells[5].textContent='N/A';}const chartInfo={ticker,fairValue,buyLevels};cells[6].innerHTML=`<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;}
+    function calculateBuyLevels({ fairValue, fiftyTwoWeekLow }) { /* ... unchanged ... */ if(fairValue===null||fiftyTwoWeekLow===null){return null;}const sdProxyPercentage=0.10;let level1,level2,level3;if(fairValue>fiftyTwoWeekLow){const baseValue=fiftyTwoWeekLow;const step=baseValue*sdProxyPercentage;level1=baseValue+step;level2=baseValue;level3=baseValue-step;}else{const baseValue=fairValue;const step=baseValue*sdProxyPercentage;level1=baseValue;level2=baseValue-step;level3=baseValue-(2*step);}return{level1,level2,level3}; }
+    async function fetchFinancialDataFromFinviz(ticker) { /* ... returns { ticker, currentPrice, fairValue, fiftyTwoWeekLow } ... */ const targetUrl=`https://finviz.com/quote.ashx?t=${ticker}`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(targetUrl)}`;try{const response=await fetch(proxyUrl);if(!response.ok)return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};const html=await response.text();const parser=new DOMParser();const doc=parser.parseFromString(html,"text/html");const data={};doc.querySelectorAll('.snapshot-table2 td').forEach((cell,i)=>{if(i%2===0){const key=cell.textContent.trim();const valueCell=doc.querySelectorAll('.snapshot-table2 td')[i+1];if(valueCell)data[key]=valueCell.textContent.trim();}});const currentPriceText=data['Price'];const currentPrice=currentPriceText?parseFloat(currentPriceText):null;const epsTTM=parseFloat(data['EPS (ttm)']);const epsNext5Y=parseFloat(data['EPS next 5Y']?.replace('%',''));let fairValue=null;if(!isNaN(epsTTM)&&!isNaN(epsNext5Y)){fairValue=calculateDCF(epsTTM,epsNext5Y/100,currentTerminalGrowthRate/100,currentDiscountRate/100);}let fiftyTwoWeekLow=null;const low52WText=data['52W Low'];if(low52WText){fiftyTwoWeekLow=parseFloat(low52WText.replace('%',''));}return{ticker,currentPrice:isNaN(currentPrice)?null:currentPrice,fairValue:fairValue,fiftyTwoWeekLow:isNaN(fiftyTwoWeekLow)?null:fiftyTwoWeekLow};}catch(error){console.error(`Finviz fetch error for ${ticker}:`,error);return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};} }
+    function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { /* ... unchanged ... */ if(discountRate<=terminalGrowthRate)return null;let pvSum=0;let currentEps=eps;for(let i=1;i<=5;i++){currentEps*=(1+growthRate5Y);pvSum+=currentEps/Math.pow(1+discountRate,i);}const terminalEps=currentEps*(1+terminalGrowthRate);const terminalValue=terminalEps/(discountRate-terminalGrowthRate);const pvTerminalValue=terminalValue/Math.pow(1+discountRate,5);return pvSum+pvTerminalValue; }
+
+    // --- Charting Logic ---
+    async function fetchStooqData(ticker) { /* ... unchanged ... */ const stooqTicker=`${ticker}.US`;const stooqUrl=`https://stooq.com/q/d/l/?s=${stooqTicker}&i=w`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error('Stooq network response was not ok.');const rawData=await response.text();if(!rawData||rawData.trim().startsWith('<'))throw new Error('Invalid data from Stooq (likely ticker not found).');const lines=rawData.trim().split('\n').slice(1);const dates=[],prices=[];lines.forEach(line=>{const cols=line.split(',');if(cols.length>=5){dates.push(cols[0]);prices.push(parseFloat(cols[4]));}});return{dates,prices};}
+    function calculateSMA(data, period) { const sma=new Array(data.length).fill(null);if(data.length<period)return sma;let sum=data.slice(0,period).reduce((a,b)=>a+b,0);sma[period-1]=sum/period;for(let i=period;i<data.length;i++){sum=sum-data[i-period]+data[i];sma[i]=sum/period;}return sma; }
+    function calculateEMA(data, period) { const ema=new Array(data.length).fill(null);if(data.length<period)return ema;const k=2/(period+1);let sum=data.slice(0,period).reduce((a,b)=>a+b,0);ema[period-1]=sum/period;for(let i=period;i<data.length;i++){if(ema[i-1]!==null){ema[i]=(data[i]*k)+(ema[i-1]*(1-k));}}return ema; }
+    function calculateMACD(data, p12 = 12, p26 = 26, pSignal = 9) { const ema12=calculateEMA(data,p12);const ema26=calculateEMA(data,p26);const macdLine=ema26.map((v,i)=>v!==null&&ema12[i]!==null?ema12[i]-v:null);const signalLine=calculateEMA(macdLine,pSignal);const histogram=signalLine.map((v,i)=>v!==null&&macdLine[i]!==null?macdLine[i]-v:null);return{macdLine,signalLine,histogram}; }
+
+    // NEW: Function to filter data based on the selected time period
+    function filterDataByPeriod(fullData, period) {
+        const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = fullData;
+        const totalPoints = dates.length;
+        if (period === 'all' || totalPoints === 0) {
+            return fullData;
+        }
+
+        let startIndex = 0;
+        const weeksInYear = 52;
+        
+        switch (period) {
+            case '7y': startIndex = Math.max(0, totalPoints - (7 * weeksInYear)); break;
+            case '5y': startIndex = Math.max(0, totalPoints - (5 * weeksInYear)); break;
+            case '3y': startIndex = Math.max(0, totalPoints - (3 * weeksInYear)); break;
+            case '1y': startIndex = Math.max(0, totalPoints - (1 * weeksInYear)); break;
+            case 'ytd': {
+                const now = new Date();
+                const startOfYear = new Date(now.getFullYear(), 0, 1);
+                const foundIndex = dates.findIndex(d => new Date(d) >= startOfYear);
+                startIndex = foundIndex !== -1 ? foundIndex : totalPoints;
+                break;
             }
-
-            async function processTableRow(rowElement) {
-                const ticker = rowElement.dataset.ticker;
-                const cells = rowElement.querySelectorAll('td');
-                try {
-                    const [priceData, fundamentalData] = await Promise.all([
-                        fetchPriceData(ticker),
-                        fetchAndParseFundamentals(ticker.split('.')[0])
-                    ]);
-
-                    if (!priceData || !fundamentalData) throw new Error('Missing data');
-
-                    const currentPrice = priceData.prices[priceData.prices.length - 1];
-                    const discountRate = parseFloat(discountRateInput.value) / 100;
-                    const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
-                    const fv = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
-                    const stdDev = calculateStdDev(priceData.prices);
-
-                    cells[1].textContent = `$${fv.toFixed(2)}`;
-                    cells[2].textContent = `$${currentPrice.toFixed(2)}`;
-                    cells[3].innerHTML = getUpsideIndicator(currentPrice, fv, stdDev);
-
-                    rowElement.addEventListener('click', () => {
-                        tickerInput.value = ticker;
-                        document.querySelectorAll('.page').forEach(p => { p.style.display = 'none'; });
-                        document.getElementById('mainPage').style.display = 'flex';
-                        fetchData();
-                    });
-                } catch (error) {
-                    cells[1].textContent = 'N/A';
-                    cells[2].textContent = 'N/A';
-                    cells[3].textContent = '-';
-                }
+            case 'mtd': {
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const foundIndex = dates.findIndex(d => new Date(d) >= startOfMonth);
+                startIndex = foundIndex !== -1 ? foundIndex : totalPoints;
+                break;
             }
+            default: startIndex = Math.max(0, totalPoints - weeksInYear); // Default to 1 year
+        }
 
-            async function fetchData() {
-                fairValue = null;
-                const ticker = tickerInput.value.trim().toUpperCase();
-                if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
-                statusMessage.textContent = `Fetching data for ${ticker}...`;
-                clearCharts();
-                try {
-                    const [priceData, fundamentalData] = await Promise.all([ fetchPriceData(ticker), fetchAndParseFundamentals(ticker.split('.')[0]) ]);
-                    allDates = priceData.dates;
-                    allPrices = priceData.prices;
-                    if (fundamentalData) {
-                        const discountRate = parseFloat(discountRateInput.value) / 100;
-                        const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
-                        if (!isNaN(discountRate) && !isNaN(terminalGrowthRate)) {
-                             fairValue = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
-                        }
-                    }
-                    localStorage.setItem(LAST_TICKER_KEY, ticker);
-                    statusMessage.textContent = `Displaying ${ticker}`;
-                    processAndDraw();
-                } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error:", error); }
-            }
-            
-            async function fetchPriceData(ticker) {
-                const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`;
-                const proxyUrl = `${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error(`Network error fetching price data`);
-                const rawData = await response.text();
-                if (rawData.trim().startsWith('<') || !rawData.toUpperCase().includes('DATE')) throw new Error('Invalid price data or ticker not found.');
-                const lines = rawData.trim().split('\n');
-                const headerLine = lines.shift(), delimiter = headerLine.includes(';') ? ';' : ',', headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
-                const dateIndex = headers.indexOf('DATE'), closeIndex = headers.indexOf('CLOSE');
-                if (dateIndex === -1 || closeIndex === -1) throw new Error('Could not parse price data columns.');
-                const dates = [], prices = [];
-                lines.forEach(line => { const cols = line.split(delimiter); if (cols.length > Math.max(dateIndex, closeIndex)) { const dateStr = cols[dateIndex], closePrice = parseFloat(cols[closeIndex]); if (dateStr && !isNaN(closePrice)) { dates.push(dateStr); prices.push(closePrice); } } });
-                if (prices.length === 0) throw new Error("No valid price data rows found.");
-                return { dates, prices };
-            }
+        return {
+            dates: dates.slice(startIndex),
+            prices: prices.slice(startIndex),
+            ema10: ema10.slice(startIndex),
+            ema20: ema20.slice(startIndex),
+            sma50: sma50.slice(startIndex),
+            sma100: sma100.slice(startIndex),
+            macdLine: macdLine.slice(startIndex),
+            signalLine: signalLine.slice(startIndex),
+            histogram: histogram.slice(startIndex),
+        };
+    }
 
-            async function fetchAndParseFundamentals(tickerSymbol) {
-                 if (!tickerSymbol) return null;
-                try {
-                    const targetUrl = `https://finviz.com/quote.ashx?t=${tickerSymbol}`;
-                    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
-                    const response = await fetch(proxyUrl);
-                    if (!response.ok) throw new Error(`Finviz network error`);
-                    const html = await response.text();
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, "text/html");
-                    const data = {};
-                    doc.querySelectorAll('.snapshot-table2 td').forEach((cell, i) => { if (i % 2 === 0) { const key = cell.textContent.trim(); if (doc.querySelectorAll('.snapshot-table2 td')[i+1]) { data[key] = doc.querySelectorAll('.snapshot-table2 td')[i+1].textContent.trim(); } } });
-                    const epsTTM = parseFloat(data['EPS (ttm)']);
-                    const epsNext5Y = parseFloat(data['EPS next 5Y']?.replace('%', ''));
-                    if (isNaN(epsTTM) || isNaN(epsNext5Y)) return null;
-                    return { epsTTM, epsNext5Y };
-                } catch (error) { console.error(`Fundamental data error for ${tickerSymbol}:`, error); return null; }
-            }
+    function destroyCharts() { if (priceChartInstance) { priceChartInstance.destroy(); priceChartInstance = null; } if (macdChartInstance) { macdChartInstance.destroy(); macdChartInstance = null; } }
+    function drawCharts(chartData, annotationData) {
+        destroyCharts();
+        const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = chartData;
+        const annotations = {};
+        if (annotationData.fairValue) { annotations.fairValue = { type: 'line', yMin: annotationData.fairValue, yMax: annotationData.fairValue, borderColor: 'gold', borderWidth: 2, borderDash: [6, 6], label: { content: 'FV', display: true, position: 'start', backgroundColor: 'rgba(255,215,0,0.7)' } }; }
+        if (annotationData.buyLevels) {
+            annotations.buy1 = { type: 'line', yMin: annotationData.buyLevels.level1, yMax: annotationData.buyLevels.level1, borderColor: 'rgba(72, 199, 142, 0.7)', borderWidth: 1, label: { content: 'B1', display: true, position: 'end', backgroundColor: 'rgba(72, 199, 142, 0.7)', font: { size: 10 } } };
+            annotations.buy2 = { type: 'line', yMin: annotationData.buyLevels.level2, yMax: annotationData.buyLevels.level2, borderColor: 'rgba(72, 199, 142, 0.9)', borderWidth: 1.5, label: { content: 'B2', display: true, position: 'end', backgroundColor: 'rgba(72, 199, 142, 0.9)', font: { size: 10 } } };
+            annotations.buy3 = { type: 'line', yMin: annotationData.buyLevels.level3, yMax: annotationData.buyLevels.level3, borderColor: 'rgba(72, 199, 142, 0.7)', borderWidth: 1, label: { content: 'B3', display: true, position: 'end', backgroundColor: 'rgba(72, 199, 142, 0.7)', font: { size: 10 } } };
+        }
+        
+        priceChartInstance = new Chart(priceCanvas, {
+            type: 'line',
+            data: { labels: dates, datasets: [ { label: 'Price', data: prices, borderColor: '#a0a0a0', borderWidth: 2, pointRadius: 0 }, { label: 'EMA 10', data: ema10, borderColor: '#3e8ed0', borderWidth: 1, pointRadius: 0 }, { label: 'EMA 20', data: ema20, borderColor: '#48c78e', borderWidth: 1, pointRadius: 0 }, { label: 'SMA 50', data: sma50, borderColor: '#fadd78', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, { label: 'SMA 100', data: sma100, borderColor: '#f14668', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, ] },
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, annotation: { annotations } } }
+        });
 
-            function processAndDraw() {
-                if (allPrices.length === 0) { clearCharts(); return; }
-                const fastPeriod = 10, slowPeriod = 20;
-                const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), sma50: calculateSMA(allPrices, 50), sma100: calculateSMA(allPrices, 100), ...calculateMACD(allPrices) };
-                const startIndex = getFilterStartIndex();
-                const dates = allDates.slice(startIndex), prices = allPrices.slice(startIndex);
-                const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), sma50: full.sma50.slice(startIndex), sma100: full.sma100.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) };
-                if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data for selected time period."; return; }
-                drawPriceChart(dates, prices, sliced, fastPeriod, slowPeriod);
-                drawMacdChart(dates, prices, sliced);
-            }
+        macdChartInstance = new Chart(macdCanvas, {
+            type: 'bar',
+            data: { labels: dates, datasets: [ { label: 'Histogram', data: histogram, backgroundColor: (context) => (context.raw >= 0 ? 'rgba(72, 199, 142, 0.7)' : 'rgba(241, 70, 104, 0.7)') }, { label: 'MACD', data: macdLine, type: 'line', borderColor: '#3e8ed0', borderWidth: 1.5, pointRadius: 0 }, { label: 'Signal', data: signalLine, type: 'line', borderColor: '#ffae42', borderWidth: 1.5, pointRadius: 0 }, ] },
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false } } }
+        });
+    }
 
-            // --- SECTION 6: CALCULATION & CHARTING ---
-            function calculateDCF(eps, g5y, tgr, dr) { let pv = 0, ce = eps; for (let i=1; i<=5; i++) { ce*=(1+g5y); pv+=ce/Math.pow(1+dr,i); } const tv=ce*(1+tgr)/(dr-tgr); return pv+tv/Math.pow(1+dr,5); }
-            function getFilterStartIndex() { const p = timePeriodSelector.value, tp = allDates.length, wiy = 52; if (p === 'all') return 0; if (p === '10yr') return Math.max(0,tp-10*wiy); if (p === '5yr') return Math.max(0,tp-5*wiy); if (p === '1yr') return Math.max(0,tp-wiy); return 0; }
-            function calculateSMA(d, p) { if (!d || d.length < p) return new Array(d.length).fill(null); const s = new Array(d.length).fill(null); let sum = 0; for (let i=0; i<p; i++) sum+=d[i]; s[p-1]=sum/p; for (let i=p; i<d.length; i++) { sum=sum-d[i-p]+d[i]; s[i]=sum/p; } return s; }
-            function calculateEMA(d, p) { if (!d || d.length < p) return new Array(d.length).fill(null); const k=2/(p+1), e=new Array(d.length).fill(null); let sum=0; for (let i=0; i<p; i++) sum+=d[i]; e[p-1]=sum/p; for (let i=p; i<d.length; i++) { if (e[i-1]!==null) e[i]=(d[i]*k)+(e[i-1]*(1-k)); } return e; }
-            function calculateMACD(d, p12=12, p26=26, pS=9) { const e12=calculateEMA(d, p12), e26=calculateEMA(d, p26); const ml=e26.map((v,i)=>v!==null&&e12[i]!==null?e12[i]-v:null); const sl=calculateEMA(ml, pS); const h=sl.map((v,i)=>v!==null&&ml[i]!==null?ml[i]-v:null); return { macdLine:ml, signalLine:sl, histogram:h }; }
-            function calculateStdDev(data) { if (!data || data.length < 2) return 0; const n = data.length; const mean = data.reduce((a, b) => a + b) / n; const variance = data.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1); return Math.sqrt(variance); }
-            function getUpsideIndicator(current, fv, sd) { if (isNaN(current) || isNaN(fv) || isNaN(sd) || sd === 0) return '-'; const indicator = '●'; let color = ''; if (current < fv) { color = '#3298dc'; } else if (current >= fv && current <= fv + sd) { color = '#ffffff'; } else if (current > fv + sd && current <= fv + 2 * sd) { color = '#ffdd57'; } else { color = '#ff3860'; } return `<span class="upside-indicator" style="color: ${color};">${indicator}</span>`; }
-            function clearCharts() { priceCtx.clearRect(0,0,priceCanvas.width,priceCanvas.height); macdCtx.clearRect(0,0,macdCanvas.width,macdCanvas.height); }
-            const drawLine = (ctx, d, mX, mY, c, lw=1.5) => { ctx.beginPath();ctx.lineWidth=lw;ctx.strokeStyle=c;let f=true; d.forEach((v,i)=>{if(v!==null){const x=mX(i),y=mY(v);if(f){ctx.moveTo(x,y);f=false;}else{ctx.lineTo(x,y);}}});ctx.stroke(); };
-            function drawPriceChart(d, p, sd, fp, sp) { const {fastEma,slowEma,sma50,sma100}=sd; const cont=priceCanvas.parentElement, w=cont.clientWidth, h=cont.clientHeight; if (w<=0||h<=0) return; priceCanvas.width=w*devicePixelRatio; priceCanvas.height=h*devicePixelRatio; priceCtx.scale(devicePixelRatio,devicePixelRatio); priceCtx.clearRect(0,0,w,h); let allVis=[...p,...fastEma.filter(v=>v),...slowEma.filter(v=>v),...sma50.filter(v=>v),...sma100.filter(v=>v)]; if(fairValue)allVis.push(fairValue); const minY=Math.min(...allVis),maxY=Math.max(...allVis); const m={t:20,r:50,b:40,l:50},cW=w-m.l-m.r,cH=h-m.t-m.b; const mX=(i)=>m.l+(p.length>1?(i/(p.length-1))*cW:cW/2),mY=(v)=>h-m.b-((v-minY)/(maxY-minY))*cH; priceCtx.font="12px sans-serif";priceCtx.textAlign='right';priceCtx.fillStyle='#a0a0a0'; for(let i=0;i<=5;i++){const val=minY+(i/5)*(maxY-minY),y=mY(val);priceCtx.beginPath();priceCtx.strokeStyle='#444';priceCtx.lineWidth=0.5;priceCtx.moveTo(m.l,y);priceCtx.lineTo(w-m.r,y);priceCtx.stroke();priceCtx.fillText(val.toFixed(2),m.l-8,y+4);} const xTS=Math.max(1,Math.floor(p.length/Math.floor(cW/100))); for(let i=0;i<p.length;i+=xTS){priceCtx.textAlign='center';priceCtx.fillText(d[i],mX(i),h-m.b+20);} drawLine(priceCtx,p,mX,mY,'#a0a0a0',1.5);drawLine(priceCtx,fastEma,mX,mY,'#3273dc');drawLine(priceCtx,slowEma,mX,mY,'#ffffff');drawLine(priceCtx,sma50,mX,mY,'#ff9800');drawLine(priceCtx,sma100,mX,mY,'#c56bf0'); if(fairValue!==null&&fairValue>=minY&&fairValue<=maxY){const y=mY(fairValue);priceCtx.beginPath();priceCtx.setLineDash([4,4]);priceCtx.strokeStyle='#ffd700';priceCtx.lineWidth=1.5;priceCtx.moveTo(m.l,y);priceCtx.lineTo(w-m.r,y);priceCtx.stroke();priceCtx.setLineDash([]);priceCtx.font="12px sans-serif";priceCtx.fillStyle='#ffd700';priceCtx.textAlign='left';priceCtx.fillText('Fair Value',w-m.r+5,y+4);} const legX=m.l+10,legY=m.t+10,lSp=18; priceCtx.font="14px sans-serif";priceCtx.textAlign='left'; priceCtx.fillStyle='#a0a0a0';priceCtx.fillText('Price',legX,legY); priceCtx.fillStyle='#3273dc';priceCtx.fillText(`Fast EMA (${fp})`,legX,legY+lSp); priceCtx.fillStyle='#23d160';priceCtx.fillText(`Slow EMA (${sp})`,legX,legY+lSp*2); priceCtx.fillStyle='#ff9800';priceCtx.fillText('50-week SMA',legX,legY+lSp*3); priceCtx.fillStyle='#c56bf0';priceCtx.fillText('100-week SMA',legX,legY+lSp*4); }
-            function drawMacdChart(d, p, sd) { const {macdLine,signalLine,histogram}=sd; const cont=macdCanvas.parentElement,w=cont.clientWidth,h=cont.clientHeight; if(w<=0||h<=0)return; macdCanvas.width=w*devicePixelRatio;macdCanvas.height=h*devicePixelRatio; macdCtx.scale(devicePixelRatio,devicePixelRatio); macdCtx.clearRect(0,0,w,h); const allVis=[...macdLine.filter(v=>v),...signalLine.filter(v=>v),...histogram.filter(v=>v)]; if(allVis.length===0)return; const minY=Math.min(...allVis),maxY=Math.max(...allVis); const m={t:20,r:50,b:40,l:50},cW=w-m.l-m.r,cH=h-m.t-m.b; const mX=(i)=>m.l+(p.length>1?(i/(p.length-1))*cW:cW/2),mY=(v)=>h-m.b-((v-minY)/(maxY-minY))*cH; const yZ=mY(0);macdCtx.beginPath();macdCtx.strokeStyle='#a0a0a0';macdCtx.lineWidth=1;macdCtx.moveTo(m.l,yZ);macdCtx.lineTo(w-m.r,yZ);macdCtx.stroke(); const bW=Math.max(1,cW/p.length*0.8); for(let i=0;i<histogram.length;i++){if(histogram[i]!==null){const x=mX(i)-bW/2,y=mY(histogram[i]);macdCtx.fillStyle=histogram[i]>0?'rgba(35,209,96,0.7)':'rgba(255,56,96,0.7)';macdCtx.fillRect(x,y,bW,yZ-y);}} drawLine(macdCtx,macdLine,mX,mY,'#007bff');drawLine(macdCtx,signalLine,mX,mY,'#fd7e14'); const legX=m.l+10,legY=m.t+10,lSp=18; macdCtx.font="14px sans-serif";macdCtx.textAlign='left'; macdCtx.fillStyle='#007bff';macdCtx.fillText('MACD Line',legX,legY); macdCtx.fillStyle='#fd7e14';macdCtx.fillText('Signal Line',legX,legY+lSp); }
-        })();
-    </script>
+</script>
 </body>
 </html>

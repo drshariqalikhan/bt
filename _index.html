@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>QualityStock Screener</title>
+    
+    <meta name="theme-color" content="#1a1d21">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QualityStock">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+
+    <style>
+        :root { --dark-bg-1: #1a1d21; --dark-bg-2: #272a2e; --dark-border: #444; --light-text: #f0f0f0; --dim-text: #a0a0a0; }
+        html { background-color: var(--dark-bg-1); height: 100svh; }
+        body { background-color: var(--dark-bg-1); color: var(--light-text); display: flex; flex-direction: column; height: 100%; margin: 0; }
+        .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); }
+        .navbar-item, .navbar-link { color: var(--light-text); cursor: pointer; }
+        .navbar-burger span { background-color: var(--light-text); }
+        .input, .select select { background-color: var(--dark-bg-1); border-color: var(--dark-border); color: var(--light-text); }
+        .label { color: var(--light-text); }
+        .table { background-color: var(--dark-bg-1); color: var(--light-text); }
+        .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; vertical-align: middle; }
+        .table.is-striped tbody tr:not(.is-selected):nth-child(even) { background-color: var(--dark-bg-2); }
+        .table.is-hoverable tbody tr:hover { background-color: #363636 !important; }
+
+        .page { display: flex; flex-direction: column; height: 100%; width: 100%; }
+        #settingsPage, #qualityValuePage { display: none; }
+        .page-nav { padding-top: env(safe-area-inset-top); flex-shrink: 0; }
+        .page-content { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
+
+        #appContainer { display: flex; flex-direction: column; gap: 1rem; height: 100%; padding: 1rem; }
+        .chart-wrapper { background-color: var(--dark-bg-2); border-radius: 6px; flex: 1; position: relative; min-height: 200px; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        .content-container { padding: 1.5rem; }
+        .settings-field { max-width: 400px; margin-bottom: 1.5rem; }
+        .upside-indicator { font-size: 1.5rem; line-height: 1; }
+    </style>
+</head>
+<body>
+
+    <!-- PAGE 1: MAIN PAGE -->
+    <div id="mainPage" class="page">
+        <nav class="navbar page-nav" role="navigation">
+            <div class="navbar-brand">
+                <a class="navbar-item has-text-weight-bold" id="goToQualityPageButton">Quality Screen</a>
+                <a role="button" class="navbar-burger" data-target="navbarBasicMenu"><span></span><span></span><span></span></a>
+            </div>
+            <div id="navbarBasicMenu" class="navbar-menu">
+                <div class="navbar-start">
+                    <div class="navbar-item"><div class="field is-grouped"><p class="control is-expanded"><input class="input" type="text" id="tickerInput" value="MSFT.US"></p><p class="control"><button id="fetchButton" class="button is-info">Fetch</button></p></div></div>
+                    <a class="navbar-item" id="goToSettingsButton">Settings</a>
+                </div>
+            </div>
+        </nav>
+        <main class="page-content">
+            <div id="appContainer">
+                <div id="priceChartWrapper" class="chart-wrapper"><canvas id="priceChart"></canvas></div>
+                <div id="macdChartWrapper" class="chart-wrapper"><canvas id="macdChart"></canvas></div>
+                <div id="statusMessage" class="has-text-centered" role="status"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- PAGE 2: SETTINGS PAGE -->
+    <div id="settingsPage" class="page">
+        <nav class="navbar page-nav">
+            <div class="navbar-brand"><a class="navbar-item back-button">< Back</a></div>
+            <div class="navbar-menu is-active"><div class="navbar-start"><div class="navbar-item has-text-weight-bold">Settings</div></div></div>
+        </nav>
+        <main class="page-content"><div class="content-container" id="settingsContainer"></div></main>
+    </div>
+
+    <!-- PAGE 3: QUALITY VALUE PAGE -->
+    <div id="qualityValuePage" class="page">
+        <nav class="navbar page-nav">
+            <div class="navbar-brand"><a class="navbar-item back-button">< Back</a></div>
+            <div class="navbar-menu is-active"><div class="navbar-start"><div class="navbar-item has-text-weight-bold">Quality Stock Value</div></div></div>
+        </nav>
+        <main class="page-content">
+            <div class="content-container">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Fair Value</th>
+                            <th>Current Price</th>
+                            <th class="has-text-centered">Upside</th>
+                        </tr>
+                    </thead>
+                    <tbody id="qualityTableBody"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        (function() {
+            // --- SECTION 1: CONSTANTS AND STATE ---
+            const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+            const LAST_TICKER_KEY = 'qualitystock_lastTicker';
+            const SETTINGS_KEY = 'qualitystock_settings';
+            let allDates = [], allPrices = [];
+            let fairValue = null;
+
+            // --- SECTION 2: DOM ELEMENT REFERENCES ---
+            let mainPage, settingsPage, qualityValuePage, goToSettingsButton, goToQualityPageButton,
+                tickerInput, fetchButton, timePeriodSelector,
+                priceCanvas, priceCtx, macdCanvas, macdCtx, statusMessage,
+                deleteDataButton, discountRateInput, terminalGrowthInput, fairValueInput,
+                qualityTableBody;
+
+            // --- SECTION 3: PRIMARY EVENT LISTENER ---
+            document.addEventListener('DOMContentLoaded', () => {
+                // Assign references
+                mainPage = document.getElementById('mainPage');
+                settingsPage = document.getElementById('settingsPage');
+                qualityValuePage = document.getElementById('qualityValuePage');
+                goToSettingsButton = document.getElementById('goToSettingsButton');
+                goToQualityPageButton = document.getElementById('goToQualityPageButton');
+                tickerInput = document.getElementById('tickerInput');
+                fetchButton = document.getElementById('fetchButton');
+                priceCanvas = document.getElementById('priceChart');
+                priceCtx = priceCanvas.getContext('2d');
+                macdCanvas = document.getElementById('macdChart');
+                macdCtx = macdCanvas.getContext('2d');
+                statusMessage = document.getElementById('statusMessage');
+                qualityTableBody = document.getElementById('qualityTableBody');
+
+                // Page Navigation
+                const showPage = (pageId) => {
+                    document.querySelectorAll('.page').forEach(p => { p.style.display = 'none'; });
+                    document.getElementById(pageId).style.display = 'flex';
+                };
+                
+                goToSettingsButton.addEventListener('click', () => {
+                    fairValueInput.value = fairValue ? `$${fairValue.toFixed(2)}` : 'N/A';
+                    showPage('settingsPage');
+                });
+                goToQualityPageButton.addEventListener('click', () => {
+                    showPage('qualityValuePage');
+                    populateQualityValueTable();
+                });
+                document.querySelectorAll('.back-button').forEach(btn => {
+                    btn.addEventListener('click', () => showPage('mainPage'));
+                });
+                
+                const burger = document.querySelector('.navbar-burger');
+                const menu = document.getElementById(burger.dataset.target);
+                burger.addEventListener('click', () => { burger.classList.toggle('is-active'); menu.classList.toggle('is-active'); });
+                
+                fetchButton.addEventListener('click', fetchData);
+                tickerInput.addEventListener('keypress', e => { if (e.key === 'Enter') fetchData(); });
+                
+                buildSettingsPage();
+
+                // App Initialization
+                loadSettings();
+                const lastTicker = localStorage.getItem(LAST_TICKER_KEY);
+                if (lastTicker) { tickerInput.value = lastTicker; }
+                fetchData();
+            });
+            
+            // --- SECTION 4: UI & SETTINGS MANAGEMENT ---
+            function buildSettingsPage() {
+                const container = document.getElementById('settingsContainer');
+                container.innerHTML = `
+                    <h2 class="title is-4 has-text-light">DCF Calculation</h2>
+                    <div class="field settings-field"><label class="label" for="discountRateInput">Discount Rate (%)</label><div class="control"><input class="input" type="number" id="discountRateInput" step="0.1"></div></div>
+                    <div class="field settings-field"><label class="label" for="terminalGrowthInput">Terminal Growth Rate (%)</label><div class="control"><input class="input" type="number" id="terminalGrowthInput" step="0.1"></div></div>
+                    <div class="field settings-field"><label class="label" for="fairValueInput">Last Calculated Fair Value</label><div class="control"><input class="input" type="text" id="fairValueInput" placeholder="N/A" readonly></div></div>
+                    <hr style="background-color: var(--dark-border);">
+                    <h2 class="title is-4 has-text-light">Chart Display</h2>
+                    <div class="field settings-field"><label class="label" for="timePeriodSelector">Time Period</label><div class="control"><div class="select is-fullwidth"><select id="timePeriodSelector"><option value="all">All Time</option><option value="10yr">10 Years</option><option value="5yr">5 Years</option><option value="1yr">1 Year</option></select></div></div></div>
+                    <hr style="background-color: var(--dark-border);">
+                    <h2 class="title is-4 has-text-light">App Data</h2>
+                    <div class="field"><div class="control"><button class="button is-danger" id="deleteDataButton">Clear All Saved Data</button></div><p class="help has-text-grey">This clears the last ticker and all saved settings.</p></div>`;
+                
+                timePeriodSelector = document.getElementById('timePeriodSelector');
+                discountRateInput = document.getElementById('discountRateInput');
+                terminalGrowthInput = document.getElementById('terminalGrowthInput');
+                fairValueInput = document.getElementById('fairValueInput');
+                deleteDataButton = document.getElementById('deleteDataButton');
+
+                timePeriodSelector.addEventListener('change', () => { saveSettings(); processAndDraw(); });
+                discountRateInput.addEventListener('change', () => { saveSettings(); fetchData(); });
+                terminalGrowthInput.addEventListener('change', () => { saveSettings(); fetchData(); });
+                deleteDataButton.addEventListener('click', () => { if (confirm("Are you sure?")) { localStorage.clear(); loadSettings(); alert("Cleared saved data."); } });
+            }
+            function saveSettings() { const settings = { discountRate: discountRateInput.value, terminalGrowth: terminalGrowthInput.value, timePeriod: timePeriodSelector.value }; localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+            function loadSettings() {
+                const savedSettings = localStorage.getItem(SETTINGS_KEY);
+                const defaults = { discountRate: '9.5', terminalGrowth: '2.5', timePeriod: '5yr' };
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    discountRateInput.value = settings.discountRate || defaults.discountRate;
+                    terminalGrowthInput.value = settings.terminalGrowth || defaults.terminalGrowth;
+                    timePeriodSelector.value = settings.timePeriod || defaults.timePeriod;
+                } else {
+                    discountRateInput.value = defaults.discountRate;
+                    terminalGrowthInput.value = defaults.terminalGrowth;
+                    timePeriodSelector.value = defaults.timePeriod;
+                }
+            }
+            
+            // --- SECTION 5: CORE LOGIC ---
+            async function populateQualityValueTable() {
+                qualityTableBody.innerHTML = `<tr><td colspan="4" class="has-text-centered">Fetching top 30 quality holdings...</td></tr>`;
+                try {
+                    const url = 'https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';
+                    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error(`Network Error fetching holdings`);
+                    
+                    const csvData = await response.text();
+                    const lines = csvData.trim().split('\n');
+                    const dataStartIndex = lines.findIndex(line => line.trim().toLowerCase().startsWith('ticker,'));
+                    if (dataStartIndex === -1) throw new Error("Could not find holdings data in CSV.");
+
+                    const holdingsData = lines.slice(dataStartIndex + 1, dataStartIndex + 31);
+                    qualityTableBody.innerHTML = ''; 
+                    
+                    const rows = [];
+                    holdingsData.forEach(line => {
+                        const columns = line.split(',');
+                        const baseTicker = columns[0]?.replace(/"/g, '').split(' ')[0] || null;
+                        if (baseTicker) {
+                            const row = document.createElement('tr');
+                            row.style.cursor = 'pointer';
+                            row.dataset.ticker = `${baseTicker}.US`;
+                            row.innerHTML = `<td>${baseTicker}</td><td class="is-family-monospace has-text-centered">...</td><td class="is-family-monospace has-text-centered">...</td><td class="has-text-centered">...</td>`;
+                            qualityTableBody.appendChild(row);
+                            rows.push(row);
+                        }
+                    });
+
+                    rows.forEach(row => processTableRow(row));
+                } catch (error) { qualityTableBody.innerHTML = `<tr><td colspan="4" class="has-text-centered has-text-danger">Error: ${error.message}</td></tr>`; }
+            }
+
+            async function processTableRow(rowElement) {
+                const ticker = rowElement.dataset.ticker;
+                const cells = rowElement.querySelectorAll('td');
+                try {
+                    const [priceData, fundamentalData] = await Promise.all([
+                        fetchPriceData(ticker),
+                        fetchAndParseFundamentals(ticker.split('.')[0])
+                    ]);
+
+                    if (!priceData || !fundamentalData) throw new Error('Missing data');
+
+                    const currentPrice = priceData.prices[priceData.prices.length - 1];
+                    const discountRate = parseFloat(discountRateInput.value) / 100;
+                    const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
+                    const fv = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
+                    const stdDev = calculateStdDev(priceData.prices);
+
+                    cells[1].textContent = `$${fv.toFixed(2)}`;
+                    cells[2].textContent = `$${currentPrice.toFixed(2)}`;
+                    cells[3].innerHTML = getUpsideIndicator(currentPrice, fv, stdDev);
+
+                    rowElement.addEventListener('click', () => {
+                        tickerInput.value = ticker;
+                        document.querySelectorAll('.page').forEach(p => { p.style.display = 'none'; });
+                        document.getElementById('mainPage').style.display = 'flex';
+                        fetchData();
+                    });
+                } catch (error) {
+                    cells[1].textContent = 'N/A';
+                    cells[2].textContent = 'N/A';
+                    cells[3].textContent = '-';
+                }
+            }
+
+            async function fetchData() {
+                fairValue = null;
+                const ticker = tickerInput.value.trim().toUpperCase();
+                if (!ticker) { statusMessage.textContent = "Please enter a ticker symbol."; return; }
+                statusMessage.textContent = `Fetching data for ${ticker}...`;
+                clearCharts();
+                try {
+                    const [priceData, fundamentalData] = await Promise.all([ fetchPriceData(ticker), fetchAndParseFundamentals(ticker.split('.')[0]) ]);
+                    allDates = priceData.dates;
+                    allPrices = priceData.prices;
+                    if (fundamentalData) {
+                        const discountRate = parseFloat(discountRateInput.value) / 100;
+                        const terminalGrowthRate = parseFloat(terminalGrowthInput.value) / 100;
+                        if (!isNaN(discountRate) && !isNaN(terminalGrowthRate)) {
+                             fairValue = calculateDCF(fundamentalData.epsTTM, fundamentalData.epsNext5Y / 100, terminalGrowthRate, discountRate);
+                        }
+                    }
+                    localStorage.setItem(LAST_TICKER_KEY, ticker);
+                    statusMessage.textContent = `Displaying ${ticker}`;
+                    processAndDraw();
+                } catch (error) { statusMessage.textContent = `Error: ${error.message}`; console.error("Fetch error:", error); }
+            }
+            
+            async function fetchPriceData(ticker) {
+                const stooqUrl = `https://stooq.com/q/d/l/?s=${ticker}&i=w&c=1`;
+                const proxyUrl = `${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error(`Network error fetching price data`);
+                const rawData = await response.text();
+                if (rawData.trim().startsWith('<') || !rawData.toUpperCase().includes('DATE')) throw new Error('Invalid price data or ticker not found.');
+                const lines = rawData.trim().split('\n');
+                const headerLine = lines.shift(), delimiter = headerLine.includes(';') ? ';' : ',', headers = headerLine.split(delimiter).map(h => h.trim().toUpperCase());
+                const dateIndex = headers.indexOf('DATE'), closeIndex = headers.indexOf('CLOSE');
+                if (dateIndex === -1 || closeIndex === -1) throw new Error('Could not parse price data columns.');
+                const dates = [], prices = [];
+                lines.forEach(line => { const cols = line.split(delimiter); if (cols.length > Math.max(dateIndex, closeIndex)) { const dateStr = cols[dateIndex], closePrice = parseFloat(cols[closeIndex]); if (dateStr && !isNaN(closePrice)) { dates.push(dateStr); prices.push(closePrice); } } });
+                if (prices.length === 0) throw new Error("No valid price data rows found.");
+                return { dates, prices };
+            }
+
+            async function fetchAndParseFundamentals(tickerSymbol) {
+                 if (!tickerSymbol) return null;
+                try {
+                    const targetUrl = `https://finviz.com/quote.ashx?t=${tickerSymbol}`;
+                    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error(`Finviz network error`);
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, "text/html");
+                    const data = {};
+                    doc.querySelectorAll('.snapshot-table2 td').forEach((cell, i) => { if (i % 2 === 0) { const key = cell.textContent.trim(); if (doc.querySelectorAll('.snapshot-table2 td')[i+1]) { data[key] = doc.querySelectorAll('.snapshot-table2 td')[i+1].textContent.trim(); } } });
+                    const epsTTM = parseFloat(data['EPS (ttm)']);
+                    const epsNext5Y = parseFloat(data['EPS next 5Y']?.replace('%', ''));
+                    if (isNaN(epsTTM) || isNaN(epsNext5Y)) return null;
+                    return { epsTTM, epsNext5Y };
+                } catch (error) { console.error(`Fundamental data error for ${tickerSymbol}:`, error); return null; }
+            }
+
+            function processAndDraw() {
+                if (allPrices.length === 0) { clearCharts(); return; }
+                const fastPeriod = 10, slowPeriod = 20;
+                const full = { fastEma: calculateEMA(allPrices, fastPeriod), slowEma: calculateEMA(allPrices, slowPeriod), sma50: calculateSMA(allPrices, 50), sma100: calculateSMA(allPrices, 100), ...calculateMACD(allPrices) };
+                const startIndex = getFilterStartIndex();
+                const dates = allDates.slice(startIndex), prices = allPrices.slice(startIndex);
+                const sliced = { fastEma: full.fastEma.slice(startIndex), slowEma: full.slowEma.slice(startIndex), sma50: full.sma50.slice(startIndex), sma100: full.sma100.slice(startIndex), macdLine: full.macdLine.slice(startIndex), signalLine: full.signalLine.slice(startIndex), histogram: full.histogram.slice(startIndex) };
+                if (prices.length === 0) { clearCharts(); statusMessage.textContent = "No data for selected time period."; return; }
+                drawPriceChart(dates, prices, sliced, fastPeriod, slowPeriod);
+                drawMacdChart(dates, prices, sliced);
+            }
+
+            // --- SECTION 6: CALCULATION & CHARTING ---
+            function calculateDCF(eps, g5y, tgr, dr) { let pv = 0, ce = eps; for (let i=1; i<=5; i++) { ce*=(1+g5y); pv+=ce/Math.pow(1+dr,i); } const tv=ce*(1+tgr)/(dr-tgr); return pv+tv/Math.pow(1+dr,5); }
+            function getFilterStartIndex() { const p = timePeriodSelector.value, tp = allDates.length, wiy = 52; if (p === 'all') return 0; if (p === '10yr') return Math.max(0,tp-10*wiy); if (p === '5yr') return Math.max(0,tp-5*wiy); if (p === '1yr') return Math.max(0,tp-wiy); return 0; }
+            function calculateSMA(d, p) { if (!d || d.length < p) return new Array(d.length).fill(null); const s = new Array(d.length).fill(null); let sum = 0; for (let i=0; i<p; i++) sum+=d[i]; s[p-1]=sum/p; for (let i=p; i<d.length; i++) { sum=sum-d[i-p]+d[i]; s[i]=sum/p; } return s; }
+            function calculateEMA(d, p) { if (!d || d.length < p) return new Array(d.length).fill(null); const k=2/(p+1), e=new Array(d.length).fill(null); let sum=0; for (let i=0; i<p; i++) sum+=d[i]; e[p-1]=sum/p; for (let i=p; i<d.length; i++) { if (e[i-1]!==null) e[i]=(d[i]*k)+(e[i-1]*(1-k)); } return e; }
+            function calculateMACD(d, p12=12, p26=26, pS=9) { const e12=calculateEMA(d, p12), e26=calculateEMA(d, p26); const ml=e26.map((v,i)=>v!==null&&e12[i]!==null?e12[i]-v:null); const sl=calculateEMA(ml, pS); const h=sl.map((v,i)=>v!==null&&ml[i]!==null?ml[i]-v:null); return { macdLine:ml, signalLine:sl, histogram:h }; }
+            function calculateStdDev(data) { if (!data || data.length < 2) return 0; const n = data.length; const mean = data.reduce((a, b) => a + b) / n; const variance = data.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1); return Math.sqrt(variance); }
+            function getUpsideIndicator(current, fv, sd) { if (isNaN(current) || isNaN(fv) || isNaN(sd) || sd === 0) return '-'; const indicator = '●'; let color = ''; if (current < fv) { color = '#3298dc'; } else if (current >= fv && current <= fv + sd) { color = '#ffffff'; } else if (current > fv + sd && current <= fv + 2 * sd) { color = '#ffdd57'; } else { color = '#ff3860'; } return `<span class="upside-indicator" style="color: ${color};">${indicator}</span>`; }
+            function clearCharts() { priceCtx.clearRect(0,0,priceCanvas.width,priceCanvas.height); macdCtx.clearRect(0,0,macdCanvas.width,macdCanvas.height); }
+            const drawLine = (ctx, d, mX, mY, c, lw=1.5) => { ctx.beginPath();ctx.lineWidth=lw;ctx.strokeStyle=c;let f=true; d.forEach((v,i)=>{if(v!==null){const x=mX(i),y=mY(v);if(f){ctx.moveTo(x,y);f=false;}else{ctx.lineTo(x,y);}}});ctx.stroke(); };
+            function drawPriceChart(d, p, sd, fp, sp) { const {fastEma,slowEma,sma50,sma100}=sd; const cont=priceCanvas.parentElement, w=cont.clientWidth, h=cont.clientHeight; if (w<=0||h<=0) return; priceCanvas.width=w*devicePixelRatio; priceCanvas.height=h*devicePixelRatio; priceCtx.scale(devicePixelRatio,devicePixelRatio); priceCtx.clearRect(0,0,w,h); let allVis=[...p,...fastEma.filter(v=>v),...slowEma.filter(v=>v),...sma50.filter(v=>v),...sma100.filter(v=>v)]; if(fairValue)allVis.push(fairValue); const minY=Math.min(...allVis),maxY=Math.max(...allVis); const m={t:20,r:50,b:40,l:50},cW=w-m.l-m.r,cH=h-m.t-m.b; const mX=(i)=>m.l+(p.length>1?(i/(p.length-1))*cW:cW/2),mY=(v)=>h-m.b-((v-minY)/(maxY-minY))*cH; priceCtx.font="12px sans-serif";priceCtx.textAlign='right';priceCtx.fillStyle='#a0a0a0'; for(let i=0;i<=5;i++){const val=minY+(i/5)*(maxY-minY),y=mY(val);priceCtx.beginPath();priceCtx.strokeStyle='#444';priceCtx.lineWidth=0.5;priceCtx.moveTo(m.l,y);priceCtx.lineTo(w-m.r,y);priceCtx.stroke();priceCtx.fillText(val.toFixed(2),m.l-8,y+4);} const xTS=Math.max(1,Math.floor(p.length/Math.floor(cW/100))); for(let i=0;i<p.length;i+=xTS){priceCtx.textAlign='center';priceCtx.fillText(d[i],mX(i),h-m.b+20);} drawLine(priceCtx,p,mX,mY,'#a0a0a0',1.5);drawLine(priceCtx,fastEma,mX,mY,'#3273dc');drawLine(priceCtx,slowEma,mX,mY,'#ffffff');drawLine(priceCtx,sma50,mX,mY,'#ff9800');drawLine(priceCtx,sma100,mX,mY,'#c56bf0'); if(fairValue!==null&&fairValue>=minY&&fairValue<=maxY){const y=mY(fairValue);priceCtx.beginPath();priceCtx.setLineDash([4,4]);priceCtx.strokeStyle='#ffd700';priceCtx.lineWidth=1.5;priceCtx.moveTo(m.l,y);priceCtx.lineTo(w-m.r,y);priceCtx.stroke();priceCtx.setLineDash([]);priceCtx.font="12px sans-serif";priceCtx.fillStyle='#ffd700';priceCtx.textAlign='left';priceCtx.fillText('Fair Value',w-m.r+5,y+4);} const legX=m.l+10,legY=m.t+10,lSp=18; priceCtx.font="14px sans-serif";priceCtx.textAlign='left'; priceCtx.fillStyle='#a0a0a0';priceCtx.fillText('Price',legX,legY); priceCtx.fillStyle='#3273dc';priceCtx.fillText(`Fast EMA (${fp})`,legX,legY+lSp); priceCtx.fillStyle='#23d160';priceCtx.fillText(`Slow EMA (${sp})`,legX,legY+lSp*2); priceCtx.fillStyle='#ff9800';priceCtx.fillText('50-week SMA',legX,legY+lSp*3); priceCtx.fillStyle='#c56bf0';priceCtx.fillText('100-week SMA',legX,legY+lSp*4); }
+            function drawMacdChart(d, p, sd) { const {macdLine,signalLine,histogram}=sd; const cont=macdCanvas.parentElement,w=cont.clientWidth,h=cont.clientHeight; if(w<=0||h<=0)return; macdCanvas.width=w*devicePixelRatio;macdCanvas.height=h*devicePixelRatio; macdCtx.scale(devicePixelRatio,devicePixelRatio); macdCtx.clearRect(0,0,w,h); const allVis=[...macdLine.filter(v=>v),...signalLine.filter(v=>v),...histogram.filter(v=>v)]; if(allVis.length===0)return; const minY=Math.min(...allVis),maxY=Math.max(...allVis); const m={t:20,r:50,b:40,l:50},cW=w-m.l-m.r,cH=h-m.t-m.b; const mX=(i)=>m.l+(p.length>1?(i/(p.length-1))*cW:cW/2),mY=(v)=>h-m.b-((v-minY)/(maxY-minY))*cH; const yZ=mY(0);macdCtx.beginPath();macdCtx.strokeStyle='#a0a0a0';macdCtx.lineWidth=1;macdCtx.moveTo(m.l,yZ);macdCtx.lineTo(w-m.r,yZ);macdCtx.stroke(); const bW=Math.max(1,cW/p.length*0.8); for(let i=0;i<histogram.length;i++){if(histogram[i]!==null){const x=mX(i)-bW/2,y=mY(histogram[i]);macdCtx.fillStyle=histogram[i]>0?'rgba(35,209,96,0.7)':'rgba(255,56,96,0.7)';macdCtx.fillRect(x,y,bW,yZ-y);}} drawLine(macdCtx,macdLine,mX,mY,'#007bff');drawLine(macdCtx,signalLine,mX,mY,'#fd7e14'); const legX=m.l+10,legY=m.t+10,lSp=18; macdCtx.font="14px sans-serif";macdCtx.textAlign='left'; macdCtx.fillStyle='#007bff';macdCtx.fillText('MACD Line',legX,legY); macdCtx.fillStyle='#fd7e14';macdCtx.fillText('Signal Line',legX,legY+lSp); }
+        })();
+    </script>
+</body>
+</html>
