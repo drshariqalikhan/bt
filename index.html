@@ -41,13 +41,12 @@
         .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); padding-top: env(safe-area-inset-top); }
         .navbar-item, .navbar-link { color: var(--light-text); cursor: pointer; }
         .navbar-item:hover, .navbar-link:hover { background-color: var(--dark-bg-1); color: var(--info-color); }
+        .navbar-item.is-info { background-color: var(--info-color); color: var(--white-color); } /* NEW: Active filter style */
         .section { padding: 1.5rem; }
         .table { background-color: var(--dark-bg-2); color: var(--light-text); }
         .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; vertical-align: middle; white-space: nowrap; }
         .table td:nth-child(2) { white-space: normal; }
         .table thead th { color: var(--info-color) !important; }
-
-        /* REMOVED: is-striped rule is no longer needed */
 
         #status-message { color: var(--dim-text); min-height: 24px; margin-bottom: 1rem; }
         .price-up { color: var(--success-color); }
@@ -80,7 +79,7 @@
 <body>
 
     <!-- Navbar -->
-    <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation"><div class="navbar-brand"><a class="navbar-item has-text-weight-bold">IWQU Holdings</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu"><span></span><span></span><span></span></a></div><div id="navbarMenu" class="navbar-menu"><div class="navbar-end"><a class="navbar-item" id="channel-button" style="display: none;">Draw Channel</a><a class="navbar-item" id="refresh-button">Refresh</a><a class="navbar-item" id="settings-button">Settings</a></div></div></nav>
+    <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation"><div class="navbar-brand"><a class="navbar-item has-text-weight-bold">IWQU Holdings</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu"><span></span><span></span><span></span></a></div><div id="navbarMenu" class="navbar-menu"><div class="navbar-end"><a class="navbar-item" id="favorites-button">Favorites</a><a class="navbar-item" id="channel-button" style="display: none;">Draw Channel</a><a class="navbar-item" id="refresh-button">Refresh</a><a class="navbar-item" id="settings-button">Settings</a></div></div></nav>
 
     <!-- Main Content Page -->
     <div id="main-content-page"><main class="section"><div class="container is-fluid"><div id="status-message" class="has-text-centered"></div><div class="table-container"><table class="table is-fullwidth is-hoverable"><thead><tr><th class="centered-cell">Fav</th><th>Ticker</th><th>Current Price</th><th>Fair Value</th><th class="centered-cell">Valuation</th><th>52W Low</th><th class="centered-cell">Buy Levels</th><th class="centered-cell">Chart</th></tr></thead><tbody id="holdings-table-body"></tbody></table></div></div></main></div>
@@ -95,14 +94,14 @@
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').then(reg => console.log('SW registered.', reg)).catch(err => console.log('SW registration failed: ', err)); }); }
 
     // --- DOM Elements ---
-    const [tableBody, statusMessage, refreshButton, settingsButton, saveSettingsButton, navbarBurger, navbarMenu, mainPage, settingsPage, chartPage, discountRateInput, terminalGrowthInput, timePeriodSelector, backToMainButton, chartTitle, chartStatus, priceCanvas, macdCanvas, channelButton, holdingsCountInput] =
-        ['holdings-table-body', 'status-message', 'refresh-button', 'settings-button', 'save-settings-button', '.navbar-burger', '#navbarMenu', 'main-content-page', 'settings-page', 'chart-page', 'discount-rate-input', 'terminal-growth-input', 'time-period-selector', 'back-to-main-button', 'chart-title', 'chart-status', 'price-chart', 'macd-chart', 'channel-button', 'holdings-count-input']
+    const [tableBody, statusMessage, refreshButton, settingsButton, saveSettingsButton, navbarBurger, navbarMenu, mainPage, settingsPage, chartPage, discountRateInput, terminalGrowthInput, timePeriodSelector, backToMainButton, chartTitle, chartStatus, priceCanvas, macdCanvas, channelButton, holdingsCountInput, favoritesButton] =
+        ['holdings-table-body', 'status-message', 'refresh-button', 'settings-button', 'save-settings-button', '.navbar-burger', '#navbarMenu', 'main-content-page', 'settings-page', 'chart-page', 'discount-rate-input', 'terminal-growth-input', 'time-period-selector', 'back-to-main-button', 'chart-title', 'chart-status', 'price-chart', 'macd-chart', 'channel-button', 'holdings-count-input', 'favorites-button']
         .map(id => document.getElementById(id) || document.querySelector(id));
 
     // --- State & Constants ---
     const CORS_PROXY = "https://api.allorigins.win/raw?url=";
     let holdingsCount = 30, currentDiscountRate = 9.5, currentTerminalGrowthRate = 2.5, currentChartPeriod = '1y';
-    let favoriteTickers = [], userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
+    let favoriteTickers = [], favoritesFilterActive = false, userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
     let currentTrendChannel = null, activeChartData = null, activeAnnotationData = null;
 
     // --- Event Listeners ---
@@ -111,6 +110,7 @@
     settingsButton.addEventListener('click', showSettingsPage);
     saveSettingsButton.addEventListener('click', saveSettingsAndReturn);
     backToMainButton.addEventListener('click', showMainPage);
+    favoritesButton.addEventListener('click', handleFavoritesFilterClick);
     navbarBurger.addEventListener('click', () => { navbarBurger.classList.toggle('is-active'); navbarMenu.classList.toggle('is-active'); });
     tableBody.addEventListener('click', handleTableClick);
     channelButton.addEventListener('click', handleChannelButtonClick);
@@ -126,22 +126,12 @@
     }
     
     // --- Page Navigation & State ---
-    function showMainPage() { destroyCharts(); settingsPage.style.display = 'none'; chartPage.style.display = 'none'; mainPage.style.display = 'block'; channelButton.style.display = 'none'; }
-    function showSettingsPage() {
-        holdingsCountInput.value = holdingsCount; discountRateInput.value = currentDiscountRate; terminalGrowthInput.value = currentTerminalGrowthRate;
-        timePeriodSelector.value = currentChartPeriod; mainPage.style.display = 'none'; chartPage.style.display = 'none'; settingsPage.style.display = 'block'; channelButton.style.display = 'none';
-    }
-    function saveSettingsAndReturn() {
-        const newCount = parseInt(holdingsCountInput.value, 10); if (!isNaN(newCount) && newCount > 0) { holdingsCount = newCount; localStorage.setItem('holdingsCount', newCount); }
-        const newDiscount = parseFloat(discountRateInput.value); if (!isNaN(newDiscount)) { localStorage.setItem('dcfDiscountRate', newDiscount); currentDiscountRate = newDiscount; }
-        const newTerminal = parseFloat(terminalGrowthInput.value); if (!isNaN(newTerminal)) { localStorage.setItem('dcfTerminalGrowthRate', newTerminal); currentTerminalGrowthRate = newTerminal; }
-        currentChartPeriod = timePeriodSelector.value; localStorage.setItem('chartTimePeriod', currentChartPeriod);
-        userModifiedBuyLevels = {};
-        showMainPage();
-        loadHoldings();
-    }
+    function showMainPage() { destroyCharts(); settingsPage.style.display = 'none'; chartPage.style.display = 'none'; mainPage.style.display = 'block'; channelButton.style.display = 'none'; favoritesButton.style.display = ''; }
+    function showSettingsPage() { holdingsCountInput.value = holdingsCount; discountRateInput.value = currentDiscountRate; terminalGrowthInput.value = currentTerminalGrowthRate; timePeriodSelector.value = currentChartPeriod; mainPage.style.display = 'none'; chartPage.style.display = 'none'; settingsPage.style.display = 'block'; channelButton.style.display = 'none'; favoritesButton.style.display = 'none'; }
+    function saveSettingsAndReturn() { const newCount = parseInt(holdingsCountInput.value, 10); if (!isNaN(newCount) && newCount > 0) { holdingsCount = newCount; localStorage.setItem('holdingsCount', newCount); } const newDiscount = parseFloat(discountRateInput.value); if (!isNaN(newDiscount)) { localStorage.setItem('dcfDiscountRate', newDiscount); currentDiscountRate = newDiscount; } const newTerminal = parseFloat(terminalGrowthInput.value); if (!isNaN(newTerminal)) { localStorage.setItem('dcfTerminalGrowthRate', newTerminal); currentTerminalGrowthRate = newTerminal; } currentChartPeriod = timePeriodSelector.value; localStorage.setItem('chartTimePeriod', currentChartPeriod); userModifiedBuyLevels = {}; showMainPage(); loadHoldings(); }
+    
     async function showChartPage(data) {
-        mainPage.style.display = 'none'; chartPage.style.display = 'block'; channelButton.style.display = 'block';
+        mainPage.style.display = 'none'; chartPage.style.display = 'block'; channelButton.style.display = 'block'; favoritesButton.style.display = 'none';
         chartTitle.textContent = `${data.ticker} Chart`; chartStatus.textContent = 'Fetching historical data...';
         currentTrendChannel = null; channelButton.textContent = 'Draw Channel';
         try {
@@ -160,13 +150,9 @@
     function handleTableClick(event) {
         const target = event.target;
         const favIcon = target.closest('.favorite-toggle');
-        if (favIcon) {
-            toggleFavorite(favIcon.dataset.ticker);
-        } else if (target.matches('.ticker-link')) {
-            event.preventDefault(); const ticker = target.dataset.ticker, row = target.closest('tr'); if (ticker && row) refreshSingleRow(ticker, row);
-        } else if (target.matches('.chart-button')) {
-            const data = JSON.parse(target.dataset.chartInfo); showChartPage(data);
-        }
+        if (favIcon) { toggleFavorite(favIcon.dataset.ticker); }
+        else if (target.matches('.ticker-link')) { event.preventDefault(); const ticker = target.dataset.ticker, row = target.closest('tr'); if (ticker && row) refreshSingleRow(ticker, row); }
+        else if (target.matches('.chart-button')) { const data = JSON.parse(target.dataset.chartInfo); showChartPage(data); }
     }
 
     async function refreshSingleRow(ticker, row) { const cells=row.cells;[2,3,5,6,7].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[4].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';}}
@@ -177,34 +163,14 @@
         try {
             const holdings = await fetchTopHoldings(holdingsCount);
             statusMessage.textContent = `Found ${holdings.length} holdings. Fetching data...`;
-            // REMOVED: No more sorting. The original order from the ETF is maintained.
             for (const holding of holdings) { processHolding(holding); }
-            statusMessage.textContent = 'All data loaded. Click Refresh for all, or a ticker for one.';
+            filterTableByFavorites(); // Apply filter if it was active
+            statusMessage.textContent = 'All data loaded.';
         } catch (error) { console.error('Failed to load holdings:', error); statusMessage.textContent = `Error: ${error.message}`; }
     }
 
-    async function fetchTopHoldings(count) {
-        const url=`https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund`;
-        const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;
-        const response=await fetch(proxyUrl);
-        if(!response.ok) throw new Error(`Network error: ${response.statusText}`);
-        const csvData=await response.text();
-        const lines=csvData.trim().split('\n');
-        const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));
-        if(dataStartIndex===-1) throw new Error("Could not find holdings data.");
-        const holdingsData=lines.slice(dataStartIndex + 1, dataStartIndex + 1 + count);
-        return holdingsData.map(line=>{ const columns=line.split(','); const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null; return{ticker:baseTicker}; }).filter(h=>h.ticker);
-    }
-    
-    async function processHolding(holding) {
-        if (!holding.ticker) return;
-        const row = document.createElement('tr');
-        row.setAttribute('data-ticker', holding.ticker);
-        row.innerHTML = `<td class="centered-cell favorite-icon"></td><td class="is-loading-cell"><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;
-        tableBody.appendChild(row);
-        try { const data = await fetchFinancialDataFromFinviz(holding.ticker); updateRowWithData(row, data); }
-        catch (error) { console.error(`Error processing ${holding.ticker}:`, error); row.cells[2].textContent = 'Error'; }
-    }
+    async function fetchTopHoldings(count) { const url=`https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund`; const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`; const response=await fetch(proxyUrl); if(!response.ok) throw new Error(`Network error: ${response.statusText}`); const csvData=await response.text(); const lines=csvData.trim().split('\n'); const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,')); if(dataStartIndex===-1) throw new Error("Could not find holdings data."); const holdingsData=lines.slice(dataStartIndex + 1, dataStartIndex + 1 + count); return holdingsData.map(line=>{ const columns=line.split(','); const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null; return{ticker:baseTicker}; }).filter(h=>h.ticker); }
+    async function processHolding(holding) { if (!holding.ticker) return; const row = document.createElement('tr'); row.setAttribute('data-ticker', holding.ticker); row.innerHTML = `<td class="centered-cell favorite-icon"></td><td class="is-loading-cell"><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`; tableBody.appendChild(row); try { const data = await fetchFinancialDataFromFinviz(holding.ticker); updateRowWithData(row, data); } catch (error) { console.error(`Error processing ${holding.ticker}:`, error); row.cells[2].textContent = 'Error'; } }
 
     function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) {
         const [favCell, tickerCell, priceCell, fvCell, valuationCell, low52wCell, buyLevelsCell, chartCell] = row.cells;
@@ -237,14 +203,38 @@
         const index = favoriteTickers.indexOf(ticker);
         if (index > -1) { favoriteTickers.splice(index, 1); } else { favoriteTickers.push(ticker); }
         localStorage.setItem('favoriteTickers', JSON.stringify(favoriteTickers));
-        
-        // Update the star icon on the specific row that was clicked without re-sorting
         const clickedRow = tableBody.querySelector(`tr[data-ticker="${ticker}"]`);
         if (clickedRow) {
             const isFav = favoriteTickers.includes(ticker);
             const favCell = clickedRow.cells[0];
             favCell.innerHTML = `<span class="favorite-icon"><svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24">${isFav ? `<path class="star-filled" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>` : `<path class="star-outline" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>`}</svg></span>`;
         }
+        // If the filter is active, re-apply it to hide/show the toggled row
+        if (favoritesFilterActive) {
+            filterTableByFavorites();
+        }
+    }
+    
+    function handleFavoritesFilterClick() {
+        favoritesFilterActive = !favoritesFilterActive;
+        favoritesButton.classList.toggle('is-info', favoritesFilterActive);
+        filterTableByFavorites();
+    }
+    
+    function filterTableByFavorites() {
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach(row => {
+            const ticker = row.dataset.ticker;
+            if (favoritesFilterActive) {
+                if (favoriteTickers.includes(ticker)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            } else {
+                row.style.display = '';
+            }
+        });
     }
 
     // --- Calculation & Data Fetching Functions ---
