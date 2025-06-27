@@ -33,6 +33,7 @@
             --danger-color: #f14668;
             --yellow-color: #fadd78;
             --white-color: #f5f5f5;
+            --black-color: #0a0a0a;
         }
 
         html, body { background-color: var(--dark-bg-1); color: var(--light-text); overflow-x: hidden; }
@@ -55,6 +56,7 @@
         .light-yellow { background-color: var(--yellow-color); }
         .light-white { background-color: var(--white-color); }
         .light-blue { background-color: var(--info-color); }
+        .light-black { background-color: var(--black-color); } /* NEW */
         
         #settings-page, #chart-page { display: none; }
         .input, .select select { background-color: var(--dark-bg-1); border-color: var(--dark-border); color: var(--light-text); }
@@ -67,8 +69,6 @@
         .chart-wrapper { position: relative; background-color: var(--dark-bg-2); border-radius: 6px; }
         #price-chart-wrapper { flex: 3; }
         #macd-chart-wrapper { flex: 1; }
-
-        /* Give draggable annotations a grab cursor */
         .draggable { cursor: ns-resize !important; }
     </style>
 </head>
@@ -79,7 +79,7 @@
         <div class="navbar-brand"><a class="navbar-item has-text-weight-bold">IWQU Holdings</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu"><span></span><span></span><span></span></a></div>
         <div id="navbarMenu" class="navbar-menu">
             <div class="navbar-end">
-                <a class="navbar-item" id="channel-button" style="display: none;">Draw Channel</a> <!-- NEW -->
+                <a class="navbar-item" id="channel-button" style="display: none;">Draw Channel</a>
                 <a class="navbar-item" id="refresh-button">Refresh</a>
                 <a class="navbar-item" id="settings-button">Settings</a>
             </div>
@@ -107,7 +107,7 @@
     const CORS_PROXY = "https://api.allorigins.win/raw?url=";
     let currentDiscountRate = 9.5, currentTerminalGrowthRate = 2.5, currentChartPeriod = '1y';
     let userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
-    let currentTrendChannel = null, activeChartData = null, activeAnnotationData = null; // NEW
+    let currentTrendChannel = null, activeChartData = null, activeAnnotationData = null;
 
     // --- Event Listeners ---
     document.addEventListener('DOMContentLoaded', initialize);
@@ -117,7 +117,7 @@
     backToMainButton.addEventListener('click', showMainPage);
     navbarBurger.addEventListener('click', () => { navbarBurger.classList.toggle('is-active'); navbarMenu.classList.toggle('is-active'); });
     tableBody.addEventListener('click', handleTableClick);
-    channelButton.addEventListener('click', handleChannelButtonClick); // NEW
+    channelButton.addEventListener('click', handleChannelButtonClick);
 
     function initialize() {
         const savedDiscount = localStorage.getItem('dcfDiscountRate'); if (savedDiscount) currentDiscountRate = parseFloat(savedDiscount);
@@ -131,20 +131,26 @@
     function showMainPage() { destroyCharts(); settingsPage.style.display = 'none'; chartPage.style.display = 'none'; mainPage.style.display = 'block'; channelButton.style.display = 'none'; }
     function showSettingsPage() { discountRateInput.value = currentDiscountRate; terminalGrowthInput.value = currentTerminalGrowthRate; timePeriodSelector.value = currentChartPeriod; mainPage.style.display = 'none'; chartPage.style.display = 'none'; settingsPage.style.display = 'block'; channelButton.style.display = 'none'; }
     function saveSettingsAndReturn() { const newDiscount = parseFloat(discountRateInput.value); if (!isNaN(newDiscount)) { localStorage.setItem('dcfDiscountRate', newDiscount); currentDiscountRate = newDiscount; } const newTerminal = parseFloat(terminalGrowthInput.value); if (!isNaN(newTerminal)) { localStorage.setItem('dcfTerminalGrowthRate', newTerminal); currentTerminalGrowthRate = newTerminal; } currentChartPeriod = timePeriodSelector.value; localStorage.setItem('chartTimePeriod', currentChartPeriod); userModifiedBuyLevels = {}; showMainPage(); loadHoldings(); }
+    
     async function showChartPage(data) {
-        mainPage.style.display = 'none'; chartPage.style.display = 'block'; channelButton.style.display = 'block'; // Show channel button
+        mainPage.style.display = 'none'; chartPage.style.display = 'block'; channelButton.style.display = 'block';
         chartTitle.textContent = `${data.ticker} Chart`; chartStatus.textContent = 'Fetching historical data...';
-        currentTrendChannel = null; channelButton.textContent = 'Draw Channel'; // Reset channel state
+        currentTrendChannel = null; channelButton.textContent = 'Draw Channel';
 
         try {
             const fullHistoricalData = await fetchStooqData(data.ticker);
             chartStatus.textContent = '';
+            
+            // Perform all calculations on the full dataset
             const prices = fullHistoricalData.prices;
             const indicators = { ema10: calculateEMA(prices, 10), ema20: calculateEMA(prices, 20), sma50: calculateSMA(prices, 50), sma100: calculateSMA(prices, 100), ...calculateMACD(prices) };
             
+            // NEW: Black Light Calculation (happens once per chart view)
+            checkForBlackLight(fullHistoricalData, data.ticker, data.currentPrice);
+
             activeChartData = filterDataByPeriod({ ...fullHistoricalData, ...indicators }, currentChartPeriod);
             activeAnnotationData = { ...data, buyLevels: userModifiedBuyLevels[data.ticker] || data.buyLevels };
-            drawCharts(); // Draw initially without channel
+            drawCharts();
         } catch (error) { chartStatus.textContent = `Error fetching chart data: ${error.message}`; }
     }
     
@@ -154,7 +160,31 @@
     async function loadHoldings() { tableBody.innerHTML='';statusMessage.textContent='Fetching top 30 holdings...';try{const holdings=await fetchTopHoldings();statusMessage.textContent=`Found ${holdings.length} holdings. Fetching data...`;for(const holding of holdings){processHolding(holding);}statusMessage.textContent='All data loaded. Click Refresh for all, or a ticker for one.';}catch(error){console.error('Failed to load holdings:',error);statusMessage.textContent=`Error: ${error.message}`;}}
     async function fetchTopHoldings() { const url='https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error(`Network error: ${response.statusText}`);const csvData=await response.text();const lines=csvData.trim().split('\n');const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));if(dataStartIndex===-1)throw new Error("Could not find holdings data.");const holdingsData=lines.slice(dataStartIndex+1,dataStartIndex+31);return holdingsData.map(line=>{const columns=line.split(',');const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null;return{ticker:baseTicker};}).filter(h=>h.ticker); }
     async function processHolding(holding) { if(!holding.ticker)return;const row=document.createElement('tr');row.setAttribute('data-ticker', holding.ticker); row.innerHTML=`<td><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;tableBody.appendChild(row);try{const data=await fetchFinancialDataFromFinviz(holding.ticker);updateRowWithData(row,data);}catch(error){console.error(`Error processing ${holding.ticker}:`,error);row.cells[1].textContent='Error';}}
-    function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) { const cells=row.cells;[1,2,3,4,5,6].forEach(i=>{cells[i].className='';cells[i].innerHTML='';});[3,5,6].forEach(i=>cells[i].classList.add('centered-cell'));cells[1].textContent=currentPrice!==null?`$${currentPrice.toFixed(2)}`:'N/A';cells[2].textContent=fairValue!==null?`$${fairValue.toFixed(2)}`:'N/A';cells[4].textContent=fiftyTwoWeekLow!==null?`$${fiftyTwoWeekLow.toFixed(2)}`:'N/A';if(currentPrice!==null&&fairValue!==null&&fairValue>0){const level1=fairValue*1.15,level2=fairValue*1.30;let lightClass='';if(currentPrice>level2)lightClass='light-red';else if(currentPrice>level1)lightClass='light-yellow';else if(currentPrice>=fairValue)lightClass='light-white';else lightClass='light-blue';cells[3].innerHTML=`<span class="traffic-light ${lightClass}"></span>`;if(fairValue>currentPrice*1.1)cells[2].classList.add('price-up');else if(currentPrice>fairValue*1.1)cells[2].classList.add('price-down');}else{cells[3].textContent='–';}const buyLevels=userModifiedBuyLevels[ticker]||calculateBuyLevels({fairValue,fiftyTwoWeekLow});if(buyLevels){cells[5].innerHTML=`$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`;}else{cells[5].textContent='N/A';}const chartInfo={ticker,fairValue,buyLevels};cells[6].innerHTML=`<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;}
+    
+    function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) {
+        const cells = row.cells;
+        [1,2,4,5,6].forEach(i => { cells[i].className = ''; cells[i].innerHTML = ''; });
+        [3,5,6].forEach(i => cells[i].classList.add('centered-cell'));
+        cells[1].textContent = currentPrice !== null ? `$${currentPrice.toFixed(2)}` : 'N/A';
+        cells[2].textContent = fairValue !== null ? `$${fairValue.toFixed(2)}` : 'N/A';
+        cells[4].textContent = fiftyTwoWeekLow !== null ? `$${fiftyTwoWeekLow.toFixed(2)}` : 'N/A';
+        
+        // MODIFIED: Do not overwrite a black light if it exists
+        if (!cells[3].querySelector('.light-black')) {
+            if (currentPrice !== null && fairValue !== null && fairValue > 0) {
+                const level1 = fairValue * 1.15, level2 = fairValue * 1.30; let lightClass = '';
+                if (currentPrice > level2) lightClass = 'light-red'; else if (currentPrice > level1) lightClass = 'light-yellow'; else if (currentPrice >= fairValue) lightClass = 'light-white'; else lightClass = 'light-blue';
+                cells[3].innerHTML = `<span class="traffic-light ${lightClass}"></span>`;
+                if (fairValue > currentPrice * 1.1) cells[2].classList.add('price-up'); else if (currentPrice > fairValue * 1.1) cells[2].classList.add('price-down');
+            } else { cells[3].textContent = '–'; }
+        }
+
+        const buyLevels = userModifiedBuyLevels[ticker] || calculateBuyLevels({ fairValue, fiftyTwoWeekLow });
+        if (buyLevels) { cells[5].innerHTML = `$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`; } else { cells[5].textContent = 'N/A'; }
+        const chartInfo = { ticker, currentPrice, fairValue, buyLevels };
+        cells[6].innerHTML = `<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;
+    }
+
     function calculateBuyLevels({ fairValue, fiftyTwoWeekLow }) { if(fairValue===null||fiftyTwoWeekLow===null){return null;}const sdProxyPercentage=0.10;let level1,level2,level3;if(fairValue>fiftyTwoWeekLow){const baseValue=fiftyTwoWeekLow;const step=baseValue*sdProxyPercentage;level1=baseValue+step;level2=baseValue;level3=baseValue-step;}else{const baseValue=fairValue;const step=baseValue*sdProxyPercentage;level1=baseValue;level2=baseValue-step;level3=baseValue-(2*step);}return{level1,level2,level3}; }
     async function fetchFinancialDataFromFinviz(ticker) { const targetUrl=`https://finviz.com/quote.ashx?t=${ticker}`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(targetUrl)}`;try{const response=await fetch(proxyUrl);if(!response.ok)return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};const html=await response.text();const parser=new DOMParser();const doc=parser.parseFromString(html,"text/html");const data={};doc.querySelectorAll('.snapshot-table2 td').forEach((cell,i)=>{if(i%2===0){const key=cell.textContent.trim();const valueCell=doc.querySelectorAll('.snapshot-table2 td')[i+1];if(valueCell)data[key]=valueCell.textContent.trim();}});const currentPriceText=data['Price'];const currentPrice=currentPriceText?parseFloat(currentPriceText):null;const epsTTM=parseFloat(data['EPS (ttm)']);const epsNext5Y=parseFloat(data['EPS next 5Y']?.replace('%',''));let fairValue=null;if(!isNaN(epsTTM)&&!isNaN(epsNext5Y)){fairValue=calculateDCF(epsTTM,epsNext5Y/100,currentTerminalGrowthRate/100,currentDiscountRate/100);}let fiftyTwoWeekLow=null;const low52WText=data['52W Low'];if(low52WText){fiftyTwoWeekLow=parseFloat(low52WText.replace('%',''));}return{ticker,currentPrice:isNaN(currentPrice)?null:currentPrice,fairValue:fairValue,fiftyTwoWeekLow:isNaN(fiftyTwoWeekLow)?null:fiftyTwoWeekLow};}catch(error){console.error(`Finviz fetch error for ${ticker}:`,error);return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};} }
     function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { if(discountRate<=terminalGrowthRate)return null;let pvSum=0;let currentEps=eps;for(let i=1;i<=5;i++){currentEps*=(1+growthRate5Y);pvSum+=currentEps/Math.pow(1+discountRate,i);}const terminalEps=currentEps*(1+terminalGrowthRate);const terminalValue=terminalEps/(discountRate-terminalGrowthRate);const pvTerminalValue=terminalValue/Math.pow(1+discountRate,5);return pvSum+pvTerminalValue; }
@@ -167,14 +197,33 @@
     function filterDataByPeriod(fullData, period) { const { dates, ...rest } = fullData; const totalPoints = dates.length; if (period === 'all' || totalPoints === 0) return fullData; let startIndex = 0; const weeksInYear = 52; switch (period) { case '7y': startIndex = Math.max(0, totalPoints - (7 * weeksInYear)); break; case '5y': startIndex = Math.max(0, totalPoints - (5 * weeksInYear)); break; case '3y': startIndex = Math.max(0, totalPoints - (3 * weeksInYear)); break; case '1y': startIndex = Math.max(0, totalPoints - (1 * weeksInYear)); break; case 'ytd': { const now = new Date(), startOfYear = new Date(now.getFullYear(), 0, 1); const foundIndex = dates.findIndex(d => new Date(d) >= startOfYear); startIndex = foundIndex !== -1 ? foundIndex : totalPoints; break; } case 'mtd': { const now = new Date(), startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); const foundIndex = dates.findIndex(d => new Date(d) >= startOfMonth); startIndex = foundIndex !== -1 ? foundIndex : totalPoints; break; } default: startIndex = Math.max(0, totalPoints - weeksInYear); } const slicedData = { dates: dates.slice(startIndex) }; for (const key in rest) { slicedData[key] = rest[key].slice(startIndex); } return slicedData; }
     function handleDragEnd(event, ticker, originalBuyLevels) { const annotationId=event.subject.id, newValue=event.subject.value; if(!userModifiedBuyLevels[ticker]){userModifiedBuyLevels[ticker]={...originalBuyLevels};} if(annotationId==='buy1')userModifiedBuyLevels[ticker].level1=newValue; if(annotationId==='buy2')userModifiedBuyLevels[ticker].level2=newValue; if(annotationId==='buy3')userModifiedBuyLevels[ticker].level3=newValue; const row=document.querySelector(`tr[data-ticker="${ticker}"]`); if(row){ const buyLevelsCell=row.cells[5], modifiedLevels=userModifiedBuyLevels[ticker]; buyLevelsCell.innerHTML=`$${modifiedLevels.level1.toFixed(2)}<br>$${modifiedLevels.level2.toFixed(2)}<br>$${modifiedLevels.level3.toFixed(2)}`; const chartButton=row.querySelector('.chart-button'), chartInfo=JSON.parse(chartButton.dataset.chartInfo); chartInfo.buyLevels=modifiedLevels; chartButton.dataset.chartInfo=JSON.stringify(chartInfo); } }
 
-    // --- NEW: Channel Calculation and Button Handler ---
     function findExtrema(data, window) { const peaks = [], troughs = []; for (let i = window; i < data.length - window; i++) { const slice = data.slice(i - window, i + window + 1); if (data[i] === Math.max(...slice)) peaks.push({ x: i, y: data[i] }); if (data[i] === Math.min(...slice)) troughs.push({ x: i, y: data[i] }); } return { peaks, troughs }; }
     function calculateLinearRegression(data) { let sumX=0,sumY=0,sumXY=0,sumXX=0;const n=data.length;for(let i=0;i<n;i++){sumX+=i;sumY+=data[i];sumXY+=i*data[i];sumXX+=i*i;} const slope=(n*sumXY-sumX*sumY)/(n*sumXX-sumX*sumX);return slope; }
     function calculateTrendChannel(prices) { if (prices.length < 10) return null; const extrema = findExtrema(prices, 5); if (extrema.peaks.length < 2 || extrema.troughs.length < 2) return null; const baseSlope = calculateLinearRegression(prices); let upperIntercept = -Infinity, lowerIntercept = Infinity; extrema.peaks.forEach(p => upperIntercept = Math.max(upperIntercept, p.y - baseSlope * p.x)); extrema.troughs.forEach(t => lowerIntercept = Math.min(lowerIntercept, t.y - baseSlope * t.x)); return { slope: baseSlope, upperIntercept, lowerIntercept }; }
-    function handleChannelButtonClick() { if (!activeChartData) return; if (currentTrendChannel) { currentTrendChannel = null; } else { currentTrendChannel = calculateTrendChannel(activeChartData.prices); } channelButton.textContent = currentTrendChannel ? 'Remove Channel' : 'Draw Channel'; drawCharts(); } // Redraw the charts
-
+    
+    // --- NEW Black Light & Channel Logic ---
+    function checkForBlackLight(fullHistoricalData, ticker, currentPrice) {
+        if (!currentPrice) return;
+        const fiveYearData = filterDataByPeriod(fullHistoricalData, '5y');
+        const channel = calculateTrendChannel(fiveYearData.prices);
+        if (channel) {
+            const xMax = fiveYearData.prices.length - 1;
+            const upperChannelValueAtEnd = channel.slope * xMax + channel.upperIntercept;
+            // Check if current price is within 3% of the upper channel
+            if (currentPrice >= upperChannelValueAtEnd * 0.97) {
+                const row = document.querySelector(`tr[data-ticker="${ticker}"]`);
+                if (row) {
+                    const valuationCell = row.cells[3];
+                    valuationCell.innerHTML = `<span class="traffic-light light-black" title="Price is within 3% of the 5-year upper channel boundary."></span>`;
+                }
+            }
+        }
+    }
+    
+    function handleChannelButtonClick() { if (!activeChartData) return; if (currentTrendChannel) { currentTrendChannel = null; } else { currentTrendChannel = calculateTrendChannel(activeChartData.prices); } channelButton.textContent = currentTrendChannel ? 'Remove Channel' : 'Draw Channel'; drawCharts(); }
+    
     function destroyCharts() { if (priceChartInstance) priceChartInstance.destroy(); if (macdChartInstance) macdChartInstance.destroy(); priceChartInstance = macdChartInstance = null; }
-    function drawCharts() { // Now draws from global state
+    function drawCharts() {
         destroyCharts();
         const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = activeChartData;
         const annotationCfg = { draggable: true, onDragEnd: (e) => handleDragEnd(e, activeAnnotationData.ticker, activeAnnotationData.buyLevels), class: 'draggable' };
@@ -182,13 +231,7 @@
         const annotations = {};
         if (activeAnnotationData.fairValue) { annotations.fairValue = { type: 'line', yMin: activeAnnotationData.fairValue, yMax: activeAnnotationData.fairValue, borderColor: 'gold', borderWidth: 2, borderDash: [6, 6], label: { content: 'FV', display: true, position: 'start', backgroundColor: 'rgba(255,215,0,0.7)' } }; }
         if (activeAnnotationData.buyLevels) { annotations.buy1 = createAnnotation('buy1', activeAnnotationData.buyLevels.level1, 'B1', 'rgba(72,199,142,0.7)'); annotations.buy2 = createAnnotation('buy2', activeAnnotationData.buyLevels.level2, 'B2', 'rgba(72,199,142,0.9)', true); annotations.buy3 = createAnnotation('buy3', activeAnnotationData.buyLevels.level3, 'B3', 'rgba(72,199,142,0.7)'); }
-        // NEW: Add channel annotations if they exist
-        if (currentTrendChannel) {
-            const { slope, upperIntercept, lowerIntercept } = currentTrendChannel;
-            const xMax = prices.length - 1;
-            annotations.channelUpper = { type: 'line', xMin: 0, yMin: upperIntercept, xMax, yMax: slope * xMax + upperIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] };
-            annotations.channelLower = { type: 'line', xMin: 0, yMin: lowerIntercept, xMax, yMax: slope * xMax + lowerIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] };
-        }
+        if (currentTrendChannel) { const { slope, upperIntercept, lowerIntercept } = currentTrendChannel, xMax = prices.length - 1; annotations.channelUpper = { type: 'line', xMin: 0, yMin: upperIntercept, xMax, yMax: slope * xMax + upperIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; annotations.channelLower = { type: 'line', xMin: 0, yMin: lowerIntercept, xMax, yMax: slope * xMax + lowerIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; }
 
         priceChartInstance = new Chart(priceCanvas, { type: 'line', data: { labels: dates, datasets: [ { label: 'Price', data: prices, borderColor: '#a0a0a0', borderWidth: 2, pointRadius: 0 }, { label: 'EMA 10', data: ema10, borderColor: '#3e8ed0', borderWidth: 1, pointRadius: 0 }, { label: 'EMA 20', data: ema20, borderColor: '#48c78e', borderWidth: 1, pointRadius: 0 }, { label: 'SMA 50', data: sma50, borderColor: '#fadd78', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, { label: 'SMA 100', data: sma100, borderColor: '#f14668', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, annotation: { annotations } } } });
         macdChartInstance = new Chart(macdCanvas, { type: 'bar', data: { labels: dates, datasets: [ { label: 'Histogram', data: histogram, backgroundColor: (ctx) => (ctx.raw>=0?'rgba(72,199,142,0.7)':'rgba(241,70,104,0.7)') }, { label: 'MACD', data: macdLine, type: 'line', borderColor: '#3e8ed0', borderWidth: 1.5, pointRadius: 0 }, { label: 'Signal', data: signalLine, type: 'line', borderColor: '#ffae42', borderWidth: 1.5, pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false } } } });
