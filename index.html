@@ -34,6 +34,7 @@
             --yellow-color: #fadd78;
             --white-color: #f5f5f5;
             --black-color: #0a0a0a;
+            --gold-color: #ffd700;
         }
 
         html, body { background-color: var(--dark-bg-1); color: var(--light-text); overflow-x: hidden; }
@@ -43,8 +44,7 @@
         .section { padding: 1.5rem; }
         .table { background-color: var(--dark-bg-2); color: var(--light-text); }
         .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; vertical-align: middle; white-space: nowrap; }
-        .table td:first-child { white-space: normal; }
-        .table.is-striped tbody tr:not(.is-selected):nth-child(even) { background-color: var(--dark-bg-1); }
+        .table td:nth-child(2) { white-space: normal; } /* Allow Ticker name to wrap */
         .table thead th { color: var(--info-color) !important; }
 
         #status-message { color: var(--dim-text); min-height: 24px; margin-bottom: 1rem; }
@@ -56,7 +56,7 @@
         .light-yellow { background-color: var(--yellow-color); }
         .light-white { background-color: var(--white-color); }
         .light-blue { background-color: var(--info-color); }
-        .light-black { background-color: var(--black-color); } /* NEW */
+        .light-black { background-color: var(--black-color); }
         
         #settings-page, #chart-page { display: none; }
         .input, .select select { background-color: var(--dark-bg-1); border-color: var(--dark-border); color: var(--light-text); }
@@ -67,30 +67,47 @@
         #chart-page { padding: 1rem; }
         .chart-container { display: flex; flex-direction: column; height: calc(100vh - 120px - env(safe-area-inset-top)); gap: 1rem; }
         .chart-wrapper { position: relative; background-color: var(--dark-bg-2); border-radius: 6px; }
-        #price-chart-wrapper { flex: 3; }
-        #macd-chart-wrapper { flex: 1; }
+        #price-chart-wrapper { flex: 3; } #macd-chart-wrapper { flex: 1; }
         .draggable { cursor: ns-resize !important; }
+
+        /* NEW: Favorite Star Styles */
+        .favorite-icon svg {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        .favorite-icon .star-outline { fill: none; stroke: var(--dim-text); stroke-width: 1.5; }
+        .favorite-icon .star-filled { fill: var(--gold-color); stroke: var(--gold-color); stroke-width: 1.5; }
+
     </style>
 </head>
 <body>
 
     <!-- Navbar -->
-    <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
-        <div class="navbar-brand"><a class="navbar-item has-text-weight-bold">IWQU Holdings</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu"><span></span><span></span><span></span></a></div>
-        <div id="navbarMenu" class="navbar-menu">
-            <div class="navbar-end">
-                <a class="navbar-item" id="channel-button" style="display: none;">Draw Channel</a>
-                <a class="navbar-item" id="refresh-button">Refresh</a>
-                <a class="navbar-item" id="settings-button">Settings</a>
-            </div>
-        </div>
-    </nav>
+    <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation"><div class="navbar-brand"><a class="navbar-item has-text-weight-bold">IWQU Holdings</a><a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu"><span></span><span></span><span></span></a></div><div id="navbarMenu" class="navbar-menu"><div class="navbar-end"><a class="navbar-item" id="channel-button" style="display: none;">Draw Channel</a><a class="navbar-item" id="refresh-button">Refresh</a><a class="navbar-item" id="settings-button">Settings</a></div></div></nav>
 
     <!-- Main Content Page -->
-    <div id="main-content-page"><main class="section"><div class="container is-fluid"><div id="status-message" class="has-text-centered"></div><div class="table-container"><table class="table is-fullwidth is-striped is-hoverable"><thead><tr><th>Ticker</th><th>Current Price</th><th>Fair Value</th><th class="centered-cell">Valuation</th><th>52W Low</th><th class="centered-cell">Buy Levels</th><th class="centered-cell">Chart</th></tr></thead><tbody id="holdings-table-body"></tbody></table></div></div></main></div>
+    <div id="main-content-page"><main class="section"><div class="container is-fluid"><div id="status-message" class="has-text-centered"></div><div class="table-container"><table class="table is-fullwidth is-striped is-hoverable"><thead><tr><th class="centered-cell">Fav</th><th>Ticker</th><th>Current Price</th><th>Fair Value</th><th class="centered-cell">Valuation</th><th>52W Low</th><th class="centered-cell">Buy Levels</th><th class="centered-cell">Chart</th></tr></thead><tbody id="holdings-table-body"></tbody></table></div></div></main></div>
 
     <!-- Settings Page -->
-    <section id="settings-page" class="section"><div class="container"><h1 class="title" style="color: var(--light-text);">Settings</h1><h2 class="subtitle mt-5" style="color: var(--light-text);">Fair Value Settings</h2><div class="field"><label for="discount-rate-input" class="label" style="color: var(--light-text);">Discount Rate (%)</label><div class="control"><input id="discount-rate-input" class="input" type="number" step="0.1" placeholder="e.g., 9.5"></div></div><div class="field"><label for="terminal-growth-input" class="label" style="color: var(--light-text);">Terminal Growth Rate (%)</label><div class="control"><input id="terminal-growth-input" class="input" type="number" step="0.1" placeholder="e.g., 2.5"></div></div><h2 class="subtitle mt-5" style="color: var(--light-text);">Chart Settings</h2><div class="field"><label for="time-period-selector" class="label" style="color: var(--light-text);">Default Chart Time Period</label><div class="control"><div class="select is-fullwidth"><select id="time-period-selector"><option value="mtd">Month to Date</option><option value="ytd">Year to Date</option><option value="1y" selected>1 Year</option><option value="3y">3 Years</option><option value="5y">5 Years</option><option value="7y">7 Years</option><option value="all">All Time</option></select></div></div></div><div class="field mt-6"><div class="control"><button id="save-settings-button" class="button is-info is-fullwidth">Save & Return</button></div></div></div></section>
+    <section id="settings-page" class="section">
+        <div class="container">
+            <h1 class="title" style="color: var(--light-text);">Settings</h1>
+            
+            <h2 class="subtitle mt-5" style="color: var(--light-text);">General Settings</h2> <!-- NEW SECTION -->
+            <div class="field"><label for="holdings-count-input" class="label" style="color: var(--light-text);">Number of Holdings to Load</label><div class="control"><input id="holdings-count-input" class="input" type="number" step="5" min="5" max="100"></div></div>
+            
+            <h2 class="subtitle mt-5" style="color: var(--light-text);">Fair Value Settings</h2>
+            <div class="field"><label for="discount-rate-input" class="label" style="color: var(--light-text);">Discount Rate (%)</label><div class="control"><input id="discount-rate-input" class="input" type="number" step="0.1" placeholder="e.g., 9.5"></div></div>
+            <div class="field"><label for="terminal-growth-input" class="label" style="color: var(--light-text);">Terminal Growth Rate (%)</label><div class="control"><input id="terminal-growth-input" class="input" type="number" step="0.1" placeholder="e.g., 2.5"></div></div>
+            
+            <h2 class="subtitle mt-5" style="color: var(--light-text);">Chart Settings</h2>
+            <div class="field"><label for="time-period-selector" class="label" style="color: var(--light-text);">Default Chart Time Period</label><div class="control"><div class="select is-fullwidth"><select id="time-period-selector"><option value="mtd">Month to Date</option><option value="ytd">Year to Date</option><option value="1y" selected>1 Year</option><option value="3y">3 Years</option><option value="5y">5 Years</option><option value="7y">7 Years</option><option value="all">All Time</option></select></div></div></div>
+            
+            <div class="field mt-6"><div class="control"><button id="save-settings-button" class="button is-info is-fullwidth">Save & Return</button></div></div>
+        </div>
+    </section>
 
     <!-- Chart Page -->
     <section id="chart-page" class="section"><div class="level"><div class="level-left"><h1 id="chart-title" class="title" style="color: var(--light-text);">Chart</h1></div><div class="level-right"><button id="back-to-main-button" class="button is-light">Back to List</button></div></div><div id="chart-status" class="has-text-centered" style="color: var(--dim-text);"></div><div class="chart-container"><div id="price-chart-wrapper" class="chart-wrapper"><canvas id="price-chart"></canvas></div><div id="macd-chart-wrapper" class="chart-wrapper"><canvas id="macd-chart"></canvas></div></div></section>
@@ -99,14 +116,14 @@
     if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').then(reg => console.log('SW registered.', reg)).catch(err => console.log('SW registration failed: ', err)); }); }
 
     // --- DOM Elements ---
-    const [tableBody, statusMessage, refreshButton, settingsButton, saveSettingsButton, navbarBurger, navbarMenu, mainPage, settingsPage, chartPage, discountRateInput, terminalGrowthInput, timePeriodSelector, backToMainButton, chartTitle, chartStatus, priceCanvas, macdCanvas, channelButton] =
-        ['holdings-table-body', 'status-message', 'refresh-button', 'settings-button', 'save-settings-button', '.navbar-burger', '#navbarMenu', 'main-content-page', 'settings-page', 'chart-page', 'discount-rate-input', 'terminal-growth-input', 'time-period-selector', 'back-to-main-button', 'chart-title', 'chart-status', 'price-chart', 'macd-chart', 'channel-button']
+    const [tableBody, statusMessage, refreshButton, settingsButton, saveSettingsButton, navbarBurger, navbarMenu, mainPage, settingsPage, chartPage, discountRateInput, terminalGrowthInput, timePeriodSelector, backToMainButton, chartTitle, chartStatus, priceCanvas, macdCanvas, channelButton, holdingsCountInput] =
+        ['holdings-table-body', 'status-message', 'refresh-button', 'settings-button', 'save-settings-button', '.navbar-burger', '#navbarMenu', 'main-content-page', 'settings-page', 'chart-page', 'discount-rate-input', 'terminal-growth-input', 'time-period-selector', 'back-to-main-button', 'chart-title', 'chart-status', 'price-chart', 'macd-chart', 'channel-button', 'holdings-count-input']
         .map(id => document.getElementById(id) || document.querySelector(id));
 
     // --- State & Constants ---
     const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-    let currentDiscountRate = 9.5, currentTerminalGrowthRate = 2.5, currentChartPeriod = '1y';
-    let userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
+    let holdingsCount = 30, currentDiscountRate = 9.5, currentTerminalGrowthRate = 2.5, currentChartPeriod = '1y';
+    let favoriteTickers = [], userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
     let currentTrendChannel = null, activeChartData = null, activeAnnotationData = null;
 
     // --- Event Listeners ---
@@ -120,17 +137,36 @@
     channelButton.addEventListener('click', handleChannelButtonClick);
 
     function initialize() {
+        const savedCount = localStorage.getItem('holdingsCount'); if(savedCount) holdingsCount = parseInt(savedCount, 10);
         const savedDiscount = localStorage.getItem('dcfDiscountRate'); if (savedDiscount) currentDiscountRate = parseFloat(savedDiscount);
         const savedTerminal = localStorage.getItem('dcfTerminalGrowthRate'); if (savedTerminal) currentTerminalGrowthRate = parseFloat(savedTerminal);
         const savedPeriod = localStorage.getItem('chartTimePeriod'); if (savedPeriod) currentChartPeriod = savedPeriod;
+        const savedFavorites = localStorage.getItem('favoriteTickers'); if (savedFavorites) favoriteTickers = JSON.parse(savedFavorites);
         Chart.defaults.color = 'rgba(240, 240, 240, 0.7)'; Chart.defaults.borderColor = 'rgba(68, 68, 68, 0.5)';
         loadHoldings();
     }
     
     // --- Page Navigation & State ---
     function showMainPage() { destroyCharts(); settingsPage.style.display = 'none'; chartPage.style.display = 'none'; mainPage.style.display = 'block'; channelButton.style.display = 'none'; }
-    function showSettingsPage() { discountRateInput.value = currentDiscountRate; terminalGrowthInput.value = currentTerminalGrowthRate; timePeriodSelector.value = currentChartPeriod; mainPage.style.display = 'none'; chartPage.style.display = 'none'; settingsPage.style.display = 'block'; channelButton.style.display = 'none'; }
-    function saveSettingsAndReturn() { const newDiscount = parseFloat(discountRateInput.value); if (!isNaN(newDiscount)) { localStorage.setItem('dcfDiscountRate', newDiscount); currentDiscountRate = newDiscount; } const newTerminal = parseFloat(terminalGrowthInput.value); if (!isNaN(newTerminal)) { localStorage.setItem('dcfTerminalGrowthRate', newTerminal); currentTerminalGrowthRate = newTerminal; } currentChartPeriod = timePeriodSelector.value; localStorage.setItem('chartTimePeriod', currentChartPeriod); userModifiedBuyLevels = {}; showMainPage(); loadHoldings(); }
+    function showSettingsPage() {
+        holdingsCountInput.value = holdingsCount;
+        discountRateInput.value = currentDiscountRate;
+        terminalGrowthInput.value = currentTerminalGrowthRate;
+        timePeriodSelector.value = currentChartPeriod;
+        mainPage.style.display = 'none';
+        chartPage.style.display = 'none';
+        settingsPage.style.display = 'block';
+        channelButton.style.display = 'none';
+    }
+    function saveSettingsAndReturn() {
+        const newCount = parseInt(holdingsCountInput.value, 10); if (!isNaN(newCount) && newCount > 0) { holdingsCount = newCount; localStorage.setItem('holdingsCount', newCount); }
+        const newDiscount = parseFloat(discountRateInput.value); if (!isNaN(newDiscount)) { localStorage.setItem('dcfDiscountRate', newDiscount); currentDiscountRate = newDiscount; }
+        const newTerminal = parseFloat(terminalGrowthInput.value); if (!isNaN(newTerminal)) { localStorage.setItem('dcfTerminalGrowthRate', newTerminal); currentTerminalGrowthRate = newTerminal; }
+        currentChartPeriod = timePeriodSelector.value; localStorage.setItem('chartTimePeriod', currentChartPeriod);
+        userModifiedBuyLevels = {};
+        showMainPage();
+        loadHoldings();
+    }
     
     async function showChartPage(data) {
         mainPage.style.display = 'none'; chartPage.style.display = 'block'; channelButton.style.display = 'block';
@@ -140,14 +176,9 @@
         try {
             const fullHistoricalData = await fetchStooqData(data.ticker);
             chartStatus.textContent = '';
-            
-            // Perform all calculations on the full dataset
             const prices = fullHistoricalData.prices;
             const indicators = { ema10: calculateEMA(prices, 10), ema20: calculateEMA(prices, 20), sma50: calculateSMA(prices, 50), sma100: calculateSMA(prices, 100), ...calculateMACD(prices) };
-            
-            // NEW: Black Light Calculation (happens once per chart view)
             checkForBlackLight(fullHistoricalData, data.ticker, data.currentPrice);
-
             activeChartData = filterDataByPeriod({ ...fullHistoricalData, ...indicators }, currentChartPeriod);
             activeAnnotationData = { ...data, buyLevels: userModifiedBuyLevels[data.ticker] || data.buyLevels };
             drawCharts();
@@ -155,87 +186,133 @@
     }
     
     // --- Main Table & Data Logic ---
-    function handleTableClick(event) { const target = event.target; if (target.matches('.ticker-link')) { event.preventDefault(); const ticker = target.dataset.ticker, row = target.closest('tr'); if (ticker && row) refreshSingleRow(ticker, row); } else if (target.matches('.chart-button')) { const data = JSON.parse(target.dataset.chartInfo); showChartPage(data); } }
-    async function refreshSingleRow(ticker, row) { const cells=row.cells;[1,2,4,5,6].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[3].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';}}
-    async function loadHoldings() { tableBody.innerHTML='';statusMessage.textContent='Fetching top 30 holdings...';try{const holdings=await fetchTopHoldings();statusMessage.textContent=`Found ${holdings.length} holdings. Fetching data...`;for(const holding of holdings){processHolding(holding);}statusMessage.textContent='All data loaded. Click Refresh for all, or a ticker for one.';}catch(error){console.error('Failed to load holdings:',error);statusMessage.textContent=`Error: ${error.message}`;}}
-    async function fetchTopHoldings() { const url='https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund';const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error(`Network error: ${response.statusText}`);const csvData=await response.text();const lines=csvData.trim().split('\n');const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));if(dataStartIndex===-1)throw new Error("Could not find holdings data.");const holdingsData=lines.slice(dataStartIndex+1,dataStartIndex+31);return holdingsData.map(line=>{const columns=line.split(',');const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null;return{ticker:baseTicker};}).filter(h=>h.ticker); }
-    async function processHolding(holding) { if(!holding.ticker)return;const row=document.createElement('tr');row.setAttribute('data-ticker', holding.ticker); row.innerHTML=`<td><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;tableBody.appendChild(row);try{const data=await fetchFinancialDataFromFinviz(holding.ticker);updateRowWithData(row,data);}catch(error){console.error(`Error processing ${holding.ticker}:`,error);row.cells[1].textContent='Error';}}
+    function handleTableClick(event) {
+        const target = event.target.closest('svg'); // Find the parent SVG
+        if (target && target.matches('.favorite-toggle')) {
+            toggleFavorite(target.dataset.ticker);
+        } else if (event.target.matches('.ticker-link')) {
+            event.preventDefault(); const ticker = event.target.dataset.ticker, row = event.target.closest('tr'); if (ticker && row) refreshSingleRow(ticker, row);
+        } else if (event.target.matches('.chart-button')) {
+            const data = JSON.parse(event.target.dataset.chartInfo); showChartPage(data);
+        }
+    }
+
+    async function refreshSingleRow(ticker, row) { const cells=row.cells;[2,3,5,6,7].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[4].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';}}
     
+    async function loadHoldings() {
+        tableBody.innerHTML = '';
+        statusMessage.textContent = `Fetching top ${holdingsCount} holdings...`;
+        try {
+            const holdings = await fetchTopHoldings(holdingsCount);
+            statusMessage.textContent = `Found ${holdings.length} holdings. Sorting and fetching data...`;
+            
+            // Sort by favorite status first, then alphabetically
+            holdings.sort((a, b) => {
+                const aIsFav = favoriteTickers.includes(a.ticker);
+                const bIsFav = favoriteTickers.includes(b.ticker);
+                if (aIsFav && !bIsFav) return -1;
+                if (!aIsFav && bIsFav) return 1;
+                return a.ticker.localeCompare(b.ticker);
+            });
+
+            for (const holding of holdings) { processHolding(holding); }
+            statusMessage.textContent = 'All data loaded. Click Refresh for all, or a ticker for one.';
+        } catch (error) { console.error('Failed to load holdings:', error); statusMessage.textContent = `Error: ${error.message}`; }
+    }
+
+    async function fetchTopHoldings(count) {
+        const url=`https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund`;
+        const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`;
+        const response=await fetch(proxyUrl);
+        if(!response.ok) throw new Error(`Network error: ${response.statusText}`);
+        const csvData=await response.text();
+        const lines=csvData.trim().split('\n');
+        const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,'));
+        if(dataStartIndex===-1) throw new Error("Could not find holdings data.");
+        const holdingsData=lines.slice(dataStartIndex + 1, dataStartIndex + 1 + count);
+        return holdingsData.map(line=>{ const columns=line.split(','); const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null; return{ticker:baseTicker}; }).filter(h=>h.ticker);
+    }
+    
+    async function processHolding(holding) {
+        if (!holding.ticker) return;
+        const row = document.createElement('tr');
+        row.setAttribute('data-ticker', holding.ticker);
+        row.innerHTML = `<td class="centered-cell favorite-icon"></td><td class="is-loading-cell"><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`;
+        tableBody.appendChild(row);
+        try { const data = await fetchFinancialDataFromFinviz(holding.ticker); updateRowWithData(row, data); }
+        catch (error) { console.error(`Error processing ${holding.ticker}:`, error); row.cells[2].textContent = 'Error'; }
+    }
+
     function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) {
-        const cells = row.cells;
-        [1,2,4,5,6].forEach(i => { cells[i].className = ''; cells[i].innerHTML = ''; });
-        [3,5,6].forEach(i => cells[i].classList.add('centered-cell'));
-        cells[1].textContent = currentPrice !== null ? `$${currentPrice.toFixed(2)}` : 'N/A';
-        cells[2].textContent = fairValue !== null ? `$${fairValue.toFixed(2)}` : 'N/A';
-        cells[4].textContent = fiftyTwoWeekLow !== null ? `$${fiftyTwoWeekLow.toFixed(2)}` : 'N/A';
+        const [favCell, tickerCell, priceCell, fvCell, valuationCell, low52wCell, buyLevelsCell, chartCell] = row.cells;
+        [tickerCell, priceCell, fvCell, valuationCell, low52wCell, buyLevelsCell, chartCell].forEach(cell => { cell.className = ''; cell.innerHTML = ''; });
+        [valuationCell, buyLevelsCell, chartCell, favCell].forEach(cell => cell.classList.add('centered-cell'));
         
-        // MODIFIED: Do not overwrite a black light if it exists
-        if (!cells[3].querySelector('.light-black')) {
+        // Favorite Icon
+        const isFav = favoriteTickers.includes(ticker);
+        favCell.innerHTML = `<span class="favorite-icon">${isFav ? `<svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24"><path class="star-filled" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : `<svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24"><path class="star-outline" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`}</span>`;
+        tickerCell.innerHTML = `<a href="#" class="ticker-link" data-ticker="${ticker}">${ticker}</a>`;
+        priceCell.textContent = currentPrice !== null ? `$${currentPrice.toFixed(2)}` : 'N/A';
+        fvCell.textContent = fairValue !== null ? `$${fairValue.toFixed(2)}` : 'N/A';
+        low52wCell.textContent = fiftyTwoWeekLow !== null ? `$${fiftyTwoWeekLow.toFixed(2)}` : 'N/A';
+        
+        if (!valuationCell.querySelector('.light-black')) {
             if (currentPrice !== null && fairValue !== null && fairValue > 0) {
                 const level1 = fairValue * 1.15, level2 = fairValue * 1.30; let lightClass = '';
                 if (currentPrice > level2) lightClass = 'light-red'; else if (currentPrice > level1) lightClass = 'light-yellow'; else if (currentPrice >= fairValue) lightClass = 'light-white'; else lightClass = 'light-blue';
-                cells[3].innerHTML = `<span class="traffic-light ${lightClass}"></span>`;
-                if (fairValue > currentPrice * 1.1) cells[2].classList.add('price-up'); else if (currentPrice > fairValue * 1.1) cells[2].classList.add('price-down');
-            } else { cells[3].textContent = '–'; }
+                valuationCell.innerHTML = `<span class="traffic-light ${lightClass}"></span>`;
+                if (fairValue > currentPrice * 1.1) fvCell.classList.add('price-up'); else if (currentPrice > fairValue * 1.1) fvCell.classList.add('price-down');
+            } else { valuationCell.textContent = '–'; }
         }
 
         const buyLevels = userModifiedBuyLevels[ticker] || calculateBuyLevels({ fairValue, fiftyTwoWeekLow });
-        if (buyLevels) { cells[5].innerHTML = `$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`; } else { cells[5].textContent = 'N/A'; }
+        if (buyLevels) { buyLevelsCell.innerHTML = `$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`; } else { buyLevelsCell.textContent = 'N/A'; }
         const chartInfo = { ticker, currentPrice, fairValue, buyLevels };
-        cells[6].innerHTML = `<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;
+        chartCell.innerHTML = `<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;
     }
 
+    function toggleFavorite(ticker) {
+        const index = favoriteTickers.indexOf(ticker);
+        if (index > -1) { favoriteTickers.splice(index, 1); } else { favoriteTickers.push(ticker); }
+        localStorage.setItem('favoriteTickers', JSON.stringify(favoriteTickers));
+        
+        // Re-sort the table in place for instant feedback
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        rows.sort((a, b) => {
+            const aTicker = a.dataset.ticker, bTicker = b.dataset.ticker;
+            const aIsFav = favoriteTickers.includes(aTicker);
+            const bIsFav = favoriteTickers.includes(bTicker);
+            if (aIsFav && !bIsFav) return -1;
+            if (!aIsFav && bIsFav) return 1;
+            return aTicker.localeCompare(bTicker);
+        });
+        
+        rows.forEach(row => tableBody.appendChild(row)); // Re-append in sorted order
+        // Update the star icon on the specific row that was clicked
+        const clickedRow = rows.find(r => r.dataset.ticker === ticker);
+        if(clickedRow) {
+            const isFav = favoriteTickers.includes(ticker);
+            clickedRow.cells[0].innerHTML = `<span class="favorite-icon">${isFav ? `<svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24"><path class="star-filled" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` : `<svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24"><path class="star-outline" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`}</span>`;
+        }
+    }
+
+    // --- Calculation & Data Fetching Functions ---
     function calculateBuyLevels({ fairValue, fiftyTwoWeekLow }) { if(fairValue===null||fiftyTwoWeekLow===null){return null;}const sdProxyPercentage=0.10;let level1,level2,level3;if(fairValue>fiftyTwoWeekLow){const baseValue=fiftyTwoWeekLow;const step=baseValue*sdProxyPercentage;level1=baseValue+step;level2=baseValue;level3=baseValue-step;}else{const baseValue=fairValue;const step=baseValue*sdProxyPercentage;level1=baseValue;level2=baseValue-step;level3=baseValue-(2*step);}return{level1,level2,level3}; }
     async function fetchFinancialDataFromFinviz(ticker) { const targetUrl=`https://finviz.com/quote.ashx?t=${ticker}`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(targetUrl)}`;try{const response=await fetch(proxyUrl);if(!response.ok)return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};const html=await response.text();const parser=new DOMParser();const doc=parser.parseFromString(html,"text/html");const data={};doc.querySelectorAll('.snapshot-table2 td').forEach((cell,i)=>{if(i%2===0){const key=cell.textContent.trim();const valueCell=doc.querySelectorAll('.snapshot-table2 td')[i+1];if(valueCell)data[key]=valueCell.textContent.trim();}});const currentPriceText=data['Price'];const currentPrice=currentPriceText?parseFloat(currentPriceText):null;const epsTTM=parseFloat(data['EPS (ttm)']);const epsNext5Y=parseFloat(data['EPS next 5Y']?.replace('%',''));let fairValue=null;if(!isNaN(epsTTM)&&!isNaN(epsNext5Y)){fairValue=calculateDCF(epsTTM,epsNext5Y/100,currentTerminalGrowthRate/100,currentDiscountRate/100);}let fiftyTwoWeekLow=null;const low52WText=data['52W Low'];if(low52WText){fiftyTwoWeekLow=parseFloat(low52WText.replace('%',''));}return{ticker,currentPrice:isNaN(currentPrice)?null:currentPrice,fairValue:fairValue,fiftyTwoWeekLow:isNaN(fiftyTwoWeekLow)?null:fiftyTwoWeekLow};}catch(error){console.error(`Finviz fetch error for ${ticker}:`,error);return{ticker,currentPrice:null,fairValue:null,fiftyTwoWeekLow:null};} }
     function calculateDCF(eps, growthRate5Y, terminalGrowthRate, discountRate) { if(discountRate<=terminalGrowthRate)return null;let pvSum=0;let currentEps=eps;for(let i=1;i<=5;i++){currentEps*=(1+growthRate5Y);pvSum+=currentEps/Math.pow(1+discountRate,i);}const terminalEps=currentEps*(1+terminalGrowthRate);const terminalValue=terminalEps/(discountRate-terminalGrowthRate);const pvTerminalValue=terminalValue/Math.pow(1+discountRate,5);return pvSum+pvTerminalValue; }
-
-    // --- Charting Logic ---
     async function fetchStooqData(ticker) { const stooqTicker=`${ticker}.US`;const stooqUrl=`https://stooq.com/q/d/l/?s=${stooqTicker}&i=w`;const proxyUrl=`${CORS_PROXY}${encodeURIComponent(stooqUrl)}`;const response=await fetch(proxyUrl);if(!response.ok)throw new Error('Stooq network response was not ok.');const rawData=await response.text();if(!rawData||rawData.trim().startsWith('<'))throw new Error('Invalid data from Stooq (likely ticker not found).');const lines=rawData.trim().split('\n').slice(1);const dates=[],prices=[];lines.forEach(line=>{const cols=line.split(',');if(cols.length>=5){dates.push(cols[0]);prices.push(parseFloat(cols[4]));}});return{dates,prices};}
     function calculateSMA(data, period) { const sma=new Array(data.length).fill(null);if(data.length<period)return sma;let sum=data.slice(0,period).reduce((a,b)=>a+b,0);sma[period-1]=sum/period;for(let i=period;i<data.length;i++){sum=sum-data[i-period]+data[i];sma[i]=sum/period;}return sma; }
     function calculateEMA(data, period) { const ema=new Array(data.length).fill(null);if(data.length<period)return ema;const k=2/(period+1);let sum=data.slice(0,period).reduce((a,b)=>a+b,0);ema[period-1]=sum/period;for(let i=period;i<data.length;i++){if(ema[i-1]!==null){ema[i]=(data[i]*k)+(ema[i-1]*(1-k));}}return ema; }
     function calculateMACD(data, p12 = 12, p26 = 26, pSignal = 9) { const ema12=calculateEMA(data,p12);const ema26=calculateEMA(data,p26);const macdLine=ema26.map((v,i)=>v!==null&&ema12[i]!==null?ema12[i]-v:null);const signalLine=calculateEMA(macdLine,pSignal);const histogram=signalLine.map((v,i)=>v!==null&&macdLine[i]!==null?macdLine[i]-v:null);return{macdLine,signalLine,histogram}; }
     function filterDataByPeriod(fullData, period) { const { dates, ...rest } = fullData; const totalPoints = dates.length; if (period === 'all' || totalPoints === 0) return fullData; let startIndex = 0; const weeksInYear = 52; switch (period) { case '7y': startIndex = Math.max(0, totalPoints - (7 * weeksInYear)); break; case '5y': startIndex = Math.max(0, totalPoints - (5 * weeksInYear)); break; case '3y': startIndex = Math.max(0, totalPoints - (3 * weeksInYear)); break; case '1y': startIndex = Math.max(0, totalPoints - (1 * weeksInYear)); break; case 'ytd': { const now = new Date(), startOfYear = new Date(now.getFullYear(), 0, 1); const foundIndex = dates.findIndex(d => new Date(d) >= startOfYear); startIndex = foundIndex !== -1 ? foundIndex : totalPoints; break; } case 'mtd': { const now = new Date(), startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1); const foundIndex = dates.findIndex(d => new Date(d) >= startOfMonth); startIndex = foundIndex !== -1 ? foundIndex : totalPoints; break; } default: startIndex = Math.max(0, totalPoints - weeksInYear); } const slicedData = { dates: dates.slice(startIndex) }; for (const key in rest) { slicedData[key] = rest[key].slice(startIndex); } return slicedData; }
-    function handleDragEnd(event, ticker, originalBuyLevels) { const annotationId=event.subject.id, newValue=event.subject.value; if(!userModifiedBuyLevels[ticker]){userModifiedBuyLevels[ticker]={...originalBuyLevels};} if(annotationId==='buy1')userModifiedBuyLevels[ticker].level1=newValue; if(annotationId==='buy2')userModifiedBuyLevels[ticker].level2=newValue; if(annotationId==='buy3')userModifiedBuyLevels[ticker].level3=newValue; const row=document.querySelector(`tr[data-ticker="${ticker}"]`); if(row){ const buyLevelsCell=row.cells[5], modifiedLevels=userModifiedBuyLevels[ticker]; buyLevelsCell.innerHTML=`$${modifiedLevels.level1.toFixed(2)}<br>$${modifiedLevels.level2.toFixed(2)}<br>$${modifiedLevels.level3.toFixed(2)}`; const chartButton=row.querySelector('.chart-button'), chartInfo=JSON.parse(chartButton.dataset.chartInfo); chartInfo.buyLevels=modifiedLevels; chartButton.dataset.chartInfo=JSON.stringify(chartInfo); } }
-
+    function handleDragEnd(event, ticker, originalBuyLevels) { const annotationId=event.subject.id, newValue=event.subject.value; if(!userModifiedBuyLevels[ticker]){userModifiedBuyLevels[ticker]={...originalBuyLevels};} if(annotationId==='buy1')userModifiedBuyLevels[ticker].level1=newValue; if(annotationId==='buy2')userModifiedBuyLevels[ticker].level2=newValue; if(annotationId==='buy3')userModifiedBuyLevels[ticker].level3=newValue; const row=document.querySelector(`tr[data-ticker="${ticker}"]`); if(row){ const buyLevelsCell=row.cells[6], modifiedLevels=userModifiedBuyLevels[ticker]; buyLevelsCell.innerHTML=`$${modifiedLevels.level1.toFixed(2)}<br>$${modifiedLevels.level2.toFixed(2)}<br>$${modifiedLevels.level3.toFixed(2)}`; const chartButton=row.querySelector('.chart-button'), chartInfo=JSON.parse(chartButton.dataset.chartInfo); chartInfo.buyLevels=modifiedLevels; chartButton.dataset.chartInfo=JSON.stringify(chartInfo); } }
     function findExtrema(data, window) { const peaks = [], troughs = []; for (let i = window; i < data.length - window; i++) { const slice = data.slice(i - window, i + window + 1); if (data[i] === Math.max(...slice)) peaks.push({ x: i, y: data[i] }); if (data[i] === Math.min(...slice)) troughs.push({ x: i, y: data[i] }); } return { peaks, troughs }; }
     function calculateLinearRegression(data) { let sumX=0,sumY=0,sumXY=0,sumXX=0;const n=data.length;for(let i=0;i<n;i++){sumX+=i;sumY+=data[i];sumXY+=i*data[i];sumXX+=i*i;} const slope=(n*sumXY-sumX*sumY)/(n*sumXX-sumX*sumX);return slope; }
     function calculateTrendChannel(prices) { if (prices.length < 10) return null; const extrema = findExtrema(prices, 5); if (extrema.peaks.length < 2 || extrema.troughs.length < 2) return null; const baseSlope = calculateLinearRegression(prices); let upperIntercept = -Infinity, lowerIntercept = Infinity; extrema.peaks.forEach(p => upperIntercept = Math.max(upperIntercept, p.y - baseSlope * p.x)); extrema.troughs.forEach(t => lowerIntercept = Math.min(lowerIntercept, t.y - baseSlope * t.x)); return { slope: baseSlope, upperIntercept, lowerIntercept }; }
-    
-    // --- NEW Black Light & Channel Logic ---
-    function checkForBlackLight(fullHistoricalData, ticker, currentPrice) {
-        if (!currentPrice) return;
-        const fiveYearData = filterDataByPeriod(fullHistoricalData, '5y');
-        const channel = calculateTrendChannel(fiveYearData.prices);
-        if (channel) {
-            const xMax = fiveYearData.prices.length - 1;
-            const upperChannelValueAtEnd = channel.slope * xMax + channel.upperIntercept;
-            // Check if current price is within 3% of the upper channel
-            if (currentPrice >= upperChannelValueAtEnd * 0.97) {
-                const row = document.querySelector(`tr[data-ticker="${ticker}"]`);
-                if (row) {
-                    const valuationCell = row.cells[3];
-                    valuationCell.innerHTML = `<span class="traffic-light light-black" title="Price is within 3% of the 5-year upper channel boundary."></span>`;
-                }
-            }
-        }
-    }
-    
+    function checkForBlackLight(fullHistoricalData, ticker, currentPrice) { if (!currentPrice) return; const fiveYearData = filterDataByPeriod(fullHistoricalData, '5y'); const channel = calculateTrendChannel(fiveYearData.prices); if (channel) { const xMax = fiveYearData.prices.length - 1; const upperChannelValueAtEnd = channel.slope * xMax + channel.upperIntercept; if (currentPrice >= upperChannelValueAtEnd * 0.97) { const row = document.querySelector(`tr[data-ticker="${ticker}"]`); if (row) { const valuationCell = row.cells[4]; valuationCell.innerHTML = `<span class="traffic-light light-black" title="Price is within 3% of the 5-year upper channel boundary."></span>`; } } } }
     function handleChannelButtonClick() { if (!activeChartData) return; if (currentTrendChannel) { currentTrendChannel = null; } else { currentTrendChannel = calculateTrendChannel(activeChartData.prices); } channelButton.textContent = currentTrendChannel ? 'Remove Channel' : 'Draw Channel'; drawCharts(); }
-    
     function destroyCharts() { if (priceChartInstance) priceChartInstance.destroy(); if (macdChartInstance) macdChartInstance.destroy(); priceChartInstance = macdChartInstance = null; }
-    function drawCharts() {
-        destroyCharts();
-        const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = activeChartData;
-        const annotationCfg = { draggable: true, onDragEnd: (e) => handleDragEnd(e, activeAnnotationData.ticker, activeAnnotationData.buyLevels), class: 'draggable' };
-        const createAnnotation = (id, y, label, color, bold) => ({ id, type: 'line', yMin: y, yMax: y, borderColor: color, borderWidth: bold ? 1.5 : 1, label: { content: label, display: true, position: 'end', backgroundColor: color, font: { size: 10 } }, ...annotationCfg });
-        const annotations = {};
-        if (activeAnnotationData.fairValue) { annotations.fairValue = { type: 'line', yMin: activeAnnotationData.fairValue, yMax: activeAnnotationData.fairValue, borderColor: 'gold', borderWidth: 2, borderDash: [6, 6], label: { content: 'FV', display: true, position: 'start', backgroundColor: 'rgba(255,215,0,0.7)' } }; }
-        if (activeAnnotationData.buyLevels) { annotations.buy1 = createAnnotation('buy1', activeAnnotationData.buyLevels.level1, 'B1', 'rgba(72,199,142,0.7)'); annotations.buy2 = createAnnotation('buy2', activeAnnotationData.buyLevels.level2, 'B2', 'rgba(72,199,142,0.9)', true); annotations.buy3 = createAnnotation('buy3', activeAnnotationData.buyLevels.level3, 'B3', 'rgba(72,199,142,0.7)'); }
-        if (currentTrendChannel) { const { slope, upperIntercept, lowerIntercept } = currentTrendChannel, xMax = prices.length - 1; annotations.channelUpper = { type: 'line', xMin: 0, yMin: upperIntercept, xMax, yMax: slope * xMax + upperIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; annotations.channelLower = { type: 'line', xMin: 0, yMin: lowerIntercept, xMax, yMax: slope * xMax + lowerIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; }
-
-        priceChartInstance = new Chart(priceCanvas, { type: 'line', data: { labels: dates, datasets: [ { label: 'Price', data: prices, borderColor: '#a0a0a0', borderWidth: 2, pointRadius: 0 }, { label: 'EMA 10', data: ema10, borderColor: '#3e8ed0', borderWidth: 1, pointRadius: 0 }, { label: 'EMA 20', data: ema20, borderColor: '#48c78e', borderWidth: 1, pointRadius: 0 }, { label: 'SMA 50', data: sma50, borderColor: '#fadd78', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, { label: 'SMA 100', data: sma100, borderColor: '#f14668', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, annotation: { annotations } } } });
-        macdChartInstance = new Chart(macdCanvas, { type: 'bar', data: { labels: dates, datasets: [ { label: 'Histogram', data: histogram, backgroundColor: (ctx) => (ctx.raw>=0?'rgba(72,199,142,0.7)':'rgba(241,70,104,0.7)') }, { label: 'MACD', data: macdLine, type: 'line', borderColor: '#3e8ed0', borderWidth: 1.5, pointRadius: 0 }, { label: 'Signal', data: signalLine, type: 'line', borderColor: '#ffae42', borderWidth: 1.5, pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false } } } });
-    }
+    function drawCharts() { destroyCharts(); const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = activeChartData; const annotationCfg = { draggable: true, onDragEnd: (e) => handleDragEnd(e, activeAnnotationData.ticker, activeAnnotationData.buyLevels), class: 'draggable' }; const createAnnotation = (id, y, label, color, bold) => ({ id, type: 'line', yMin: y, yMax: y, borderColor: color, borderWidth: bold ? 1.5 : 1, label: { content: label, display: true, position: 'end', backgroundColor: color, font: { size: 10 } }, ...annotationCfg }); const annotations = {}; if (activeAnnotationData.fairValue) { annotations.fairValue = { type: 'line', yMin: activeAnnotationData.fairValue, yMax: activeAnnotationData.fairValue, borderColor: 'gold', borderWidth: 2, borderDash: [6, 6], label: { content: 'FV', display: true, position: 'start', backgroundColor: 'rgba(255,215,0,0.7)' } }; } if (activeAnnotationData.buyLevels) { annotations.buy1 = createAnnotation('buy1', activeAnnotationData.buyLevels.level1, 'B1', 'rgba(72,199,142,0.7)'); annotations.buy2 = createAnnotation('buy2', activeAnnotationData.buyLevels.level2, 'B2', 'rgba(72,199,142,0.9)', true); annotations.buy3 = createAnnotation('buy3', activeAnnotationData.buyLevels.level3, 'B3', 'rgba(72,199,142,0.7)'); } if (currentTrendChannel) { const { slope, upperIntercept, lowerIntercept } = currentTrendChannel, xMax = prices.length - 1; annotations.channelUpper = { type: 'line', xMin: 0, yMin: upperIntercept, xMax, yMax: slope * xMax + upperIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; annotations.channelLower = { type: 'line', xMin: 0, yMin: lowerIntercept, xMax, yMax: slope * xMax + lowerIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; } priceChartInstance = new Chart(priceCanvas, { type: 'line', data: { labels: dates, datasets: [ { label: 'Price', data: prices, borderColor: '#a0a0a0', borderWidth: 2, pointRadius: 0 }, { label: 'EMA 10', data: ema10, borderColor: '#3e8ed0', borderWidth: 1, pointRadius: 0 }, { label: 'EMA 20', data: ema20, borderColor: '#48c78e', borderWidth: 1, pointRadius: 0 }, { label: 'SMA 50', data: sma50, borderColor: '#fadd78', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, { label: 'SMA 100', data: sma100, borderColor: '#f14668', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, annotation: { annotations } } } }); macdChartInstance = new Chart(macdCanvas, { type: 'bar', data: { labels: dates, datasets: [ { label: 'Histogram', data: histogram, backgroundColor: (ctx) => (ctx.raw>=0?'rgba(72,199,142,0.7)':'rgba(241,70,104,0.7)') }, { label: 'MACD', data: macdLine, type: 'line', borderColor: '#3e8ed0', borderWidth: 1.5, pointRadius: 0 }, { label: 'Signal', data: signalLine, type: 'line', borderColor: '#ffae42', borderWidth: 1.5, pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false } } } }); }
 
 </script>
 </body>
