@@ -41,7 +41,7 @@
         .navbar { background-color: var(--dark-bg-2); border-bottom: 1px solid var(--dark-border); padding-top: env(safe-area-inset-top); }
         .navbar-item, .navbar-link { color: var(--light-text); cursor: pointer; }
         .navbar-item:hover, .navbar-link:hover { background-color: var(--dark-bg-1); color: var(--info-color); }
-        .navbar-item.is-info { background-color: var(--info-color); color: var(--white-color); } /* NEW: Active filter style */
+        .navbar-item.is-info { background-color: var(--info-color); color: var(--white-color); }
         .section { padding: 1.5rem; }
         .table { background-color: var(--dark-bg-2); color: var(--light-text); }
         .table th, .table td { border-color: var(--dark-border) !important; color: var(--light-text) !important; vertical-align: middle; white-space: nowrap; }
@@ -129,7 +129,6 @@
     function showMainPage() { destroyCharts(); settingsPage.style.display = 'none'; chartPage.style.display = 'none'; mainPage.style.display = 'block'; channelButton.style.display = 'none'; favoritesButton.style.display = ''; }
     function showSettingsPage() { holdingsCountInput.value = holdingsCount; discountRateInput.value = currentDiscountRate; terminalGrowthInput.value = currentTerminalGrowthRate; timePeriodSelector.value = currentChartPeriod; mainPage.style.display = 'none'; chartPage.style.display = 'none'; settingsPage.style.display = 'block'; channelButton.style.display = 'none'; favoritesButton.style.display = 'none'; }
     function saveSettingsAndReturn() { const newCount = parseInt(holdingsCountInput.value, 10); if (!isNaN(newCount) && newCount > 0) { holdingsCount = newCount; localStorage.setItem('holdingsCount', newCount); } const newDiscount = parseFloat(discountRateInput.value); if (!isNaN(newDiscount)) { localStorage.setItem('dcfDiscountRate', newDiscount); currentDiscountRate = newDiscount; } const newTerminal = parseFloat(terminalGrowthInput.value); if (!isNaN(newTerminal)) { localStorage.setItem('dcfTerminalGrowthRate', newTerminal); currentTerminalGrowthRate = newTerminal; } currentChartPeriod = timePeriodSelector.value; localStorage.setItem('chartTimePeriod', currentChartPeriod); userModifiedBuyLevels = {}; showMainPage(); loadHoldings(); }
-    
     async function showChartPage(data) {
         mainPage.style.display = 'none'; chartPage.style.display = 'block'; channelButton.style.display = 'block'; favoritesButton.style.display = 'none';
         chartTitle.textContent = `${data.ticker} Chart`; chartStatus.textContent = 'Fetching historical data...';
@@ -154,88 +153,29 @@
         else if (target.matches('.ticker-link')) { event.preventDefault(); const ticker = target.dataset.ticker, row = target.closest('tr'); if (ticker && row) refreshSingleRow(ticker, row); }
         else if (target.matches('.chart-button')) { const data = JSON.parse(target.dataset.chartInfo); showChartPage(data); }
     }
-
     async function refreshSingleRow(ticker, row) { const cells=row.cells;[2,3,5,6,7].forEach(i=>cells[i].innerHTML=`<span class="is-loading-cell">...</span>`);cells[4].innerHTML='';try{const data=await fetchFinancialDataFromFinviz(ticker);updateRowWithData(row,data);}catch(error){console.error(`Error refreshing ${ticker}:`,error);row.cells[1].textContent='Error';}}
-    
-    async function loadHoldings() {
-        tableBody.innerHTML = '';
-        statusMessage.textContent = `Fetching top ${holdingsCount} holdings...`;
-        try {
-            const holdings = await fetchTopHoldings(holdingsCount);
-            statusMessage.textContent = `Found ${holdings.length} holdings. Fetching data...`;
-            for (const holding of holdings) { processHolding(holding); }
-            filterTableByFavorites(); // Apply filter if it was active
-            statusMessage.textContent = 'All data loaded.';
-        } catch (error) { console.error('Failed to load holdings:', error); statusMessage.textContent = `Error: ${error.message}`; }
-    }
-
+    async function loadHoldings() { tableBody.innerHTML = ''; statusMessage.textContent = `Fetching top ${holdingsCount} holdings...`; try { const holdings = await fetchTopHoldings(holdingsCount); statusMessage.textContent = `Found ${holdings.length} holdings. Fetching data...`; for (const holding of holdings) { processHolding(holding); } filterTableByFavorites(); statusMessage.textContent = 'All data loaded.'; } catch (error) { console.error('Failed to load holdings:', error); statusMessage.textContent = `Error: ${error.message}`; } }
     async function fetchTopHoldings(count) { const url=`https://www.ishares.com/uk/individual/en/products/270054/ishares-msci-world-quality-factor-ucits-etf/1506575576011.ajax?fileType=csv&fileName=IWQU_holdings&dataType=fund`; const proxyUrl=`${CORS_PROXY}${encodeURIComponent(url)}`; const response=await fetch(proxyUrl); if(!response.ok) throw new Error(`Network error: ${response.statusText}`); const csvData=await response.text(); const lines=csvData.trim().split('\n'); const dataStartIndex=lines.findIndex(line=>line.trim().startsWith('Ticker,')); if(dataStartIndex===-1) throw new Error("Could not find holdings data."); const holdingsData=lines.slice(dataStartIndex + 1, dataStartIndex + 1 + count); return holdingsData.map(line=>{ const columns=line.split(','); const baseTicker=columns[0]?.replace(/"/g,'').split(' ')[0]||null; return{ticker:baseTicker}; }).filter(h=>h.ticker); }
     async function processHolding(holding) { if (!holding.ticker) return; const row = document.createElement('tr'); row.setAttribute('data-ticker', holding.ticker); row.innerHTML = `<td class="centered-cell favorite-icon"></td><td class="is-loading-cell"><a href="#" class="ticker-link" data-ticker="${holding.ticker}">${holding.ticker}</a></td><td class="is-loading-cell">...</td><td class="is-loading-cell">...</td><td class="centered-cell"></td><td class="is-loading-cell">...</td><td class="centered-cell is-loading-cell">...</td><td class="centered-cell"></td>`; tableBody.appendChild(row); try { const data = await fetchFinancialDataFromFinviz(holding.ticker); updateRowWithData(row, data); } catch (error) { console.error(`Error processing ${holding.ticker}:`, error); row.cells[2].textContent = 'Error'; } }
-
     function updateRowWithData(row, { ticker, currentPrice, fairValue, fiftyTwoWeekLow }) {
         const [favCell, tickerCell, priceCell, fvCell, valuationCell, low52wCell, buyLevelsCell, chartCell] = row.cells;
         [tickerCell, priceCell, fvCell, valuationCell, low52wCell, buyLevelsCell, chartCell].forEach(cell => { cell.className = ''; cell.innerHTML = ''; });
         [valuationCell, buyLevelsCell, chartCell, favCell].forEach(cell => cell.classList.add('centered-cell'));
-        
         const isFav = favoriteTickers.includes(ticker);
         favCell.innerHTML = `<span class="favorite-icon"><svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24">${isFav ? `<path class="star-filled" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>` : `<path class="star-outline" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>`}</svg></span>`;
         tickerCell.innerHTML = `<a href="#" class="ticker-link" data-ticker="${ticker}">${ticker}</a>`;
         priceCell.textContent = currentPrice !== null ? `$${currentPrice.toFixed(2)}` : 'N/A';
         fvCell.textContent = fairValue !== null ? `$${fairValue.toFixed(2)}` : 'N/A';
         low52wCell.textContent = fiftyTwoWeekLow !== null ? `$${fiftyTwoWeekLow.toFixed(2)}` : 'N/A';
-        
-        if (!valuationCell.querySelector('.light-black')) {
-            if (currentPrice !== null && fairValue !== null && fairValue > 0) {
-                const level1 = fairValue * 1.15, level2 = fairValue * 1.30; let lightClass = '';
-                if (currentPrice > level2) lightClass = 'light-red'; else if (currentPrice > level1) lightClass = 'light-yellow'; else if (currentPrice >= fairValue) lightClass = 'light-white'; else lightClass = 'light-blue';
-                valuationCell.innerHTML = `<span class="traffic-light ${lightClass}"></span>`;
-                if (fairValue > currentPrice * 1.1) fvCell.classList.add('price-up'); else if (currentPrice > fairValue * 1.1) fvCell.classList.add('price-down');
-            } else { valuationCell.textContent = '–'; }
-        }
-
+        if (!valuationCell.querySelector('.light-black')) { if (currentPrice !== null && fairValue !== null && fairValue > 0) { const level1 = fairValue * 1.15, level2 = fairValue * 1.30; let lightClass = ''; if (currentPrice > level2) lightClass = 'light-red'; else if (currentPrice > level1) lightClass = 'light-yellow'; else if (currentPrice >= fairValue) lightClass = 'light-white'; else lightClass = 'light-blue'; valuationCell.innerHTML = `<span class="traffic-light ${lightClass}"></span>`; if (fairValue > currentPrice * 1.1) fvCell.classList.add('price-up'); else if (currentPrice > fairValue * 1.1) fvCell.classList.add('price-down'); } else { valuationCell.textContent = '–'; } }
         const buyLevels = userModifiedBuyLevels[ticker] || calculateBuyLevels({ fairValue, fiftyTwoWeekLow });
         if (buyLevels) { buyLevelsCell.innerHTML = `$${buyLevels.level1.toFixed(2)}<br>$${buyLevels.level2.toFixed(2)}<br>$${buyLevels.level3.toFixed(2)}`; } else { buyLevelsCell.textContent = 'N/A'; }
         const chartInfo = { ticker, currentPrice, fairValue, buyLevels };
         chartCell.innerHTML = `<button class="button is-small is-info is-outlined chart-button" data-chart-info='${JSON.stringify(chartInfo)}'>Chart</button>`;
     }
-
-    function toggleFavorite(ticker) {
-        const index = favoriteTickers.indexOf(ticker);
-        if (index > -1) { favoriteTickers.splice(index, 1); } else { favoriteTickers.push(ticker); }
-        localStorage.setItem('favoriteTickers', JSON.stringify(favoriteTickers));
-        const clickedRow = tableBody.querySelector(`tr[data-ticker="${ticker}"]`);
-        if (clickedRow) {
-            const isFav = favoriteTickers.includes(ticker);
-            const favCell = clickedRow.cells[0];
-            favCell.innerHTML = `<span class="favorite-icon"><svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24">${isFav ? `<path class="star-filled" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>` : `<path class="star-outline" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>`}</svg></span>`;
-        }
-        // If the filter is active, re-apply it to hide/show the toggled row
-        if (favoritesFilterActive) {
-            filterTableByFavorites();
-        }
-    }
-    
-    function handleFavoritesFilterClick() {
-        favoritesFilterActive = !favoritesFilterActive;
-        favoritesButton.classList.toggle('is-info', favoritesFilterActive);
-        filterTableByFavorites();
-    }
-    
-    function filterTableByFavorites() {
-        const rows = tableBody.querySelectorAll('tr');
-        rows.forEach(row => {
-            const ticker = row.dataset.ticker;
-            if (favoritesFilterActive) {
-                if (favoriteTickers.includes(ticker)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            } else {
-                row.style.display = '';
-            }
-        });
-    }
+    function toggleFavorite(ticker) { const index = favoriteTickers.indexOf(ticker); if (index > -1) { favoriteTickers.splice(index, 1); } else { favoriteTickers.push(ticker); } localStorage.setItem('favoriteTickers', JSON.stringify(favoriteTickers)); const clickedRow = tableBody.querySelector(`tr[data-ticker="${ticker}"]`); if (clickedRow) { const isFav = favoriteTickers.includes(ticker); const favCell = clickedRow.cells[0]; favCell.innerHTML = `<span class="favorite-icon"><svg class="favorite-toggle" data-ticker="${ticker}" viewBox="0 0 24 24">${isFav ? `<path class="star-filled" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>` : `<path class="star-outline" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>`}</svg></span>`; } if (favoritesFilterActive) { filterTableByFavorites(); } }
+    function handleFavoritesFilterClick() { favoritesFilterActive = !favoritesFilterActive; favoritesButton.classList.toggle('is-info', favoritesFilterActive); filterTableByFavorites(); }
+    function filterTableByFavorites() { const rows = tableBody.querySelectorAll('tr'); rows.forEach(row => { const ticker = row.dataset.ticker; if (favoritesFilterActive) { if (favoriteTickers.includes(ticker)) { row.style.display = ''; } else { row.style.display = 'none'; } } else { row.style.display = ''; } }); }
 
     // --- Calculation & Data Fetching Functions ---
     function calculateBuyLevels({ fairValue, fiftyTwoWeekLow }) { if(fairValue===null||fiftyTwoWeekLow===null){return null;}const sdProxyPercentage=0.10;let level1,level2,level3;if(fairValue>fiftyTwoWeekLow){const baseValue=fiftyTwoWeekLow;const step=baseValue*sdProxyPercentage;level1=baseValue+step;level2=baseValue;level3=baseValue-step;}else{const baseValue=fairValue;const step=baseValue*sdProxyPercentage;level1=baseValue;level2=baseValue-step;level3=baseValue-(2*step);}return{level1,level2,level3}; }
@@ -253,7 +193,37 @@
     function checkForBlackLight(fullHistoricalData, ticker, currentPrice) { if (!currentPrice) return; const fiveYearData = filterDataByPeriod(fullHistoricalData, '5y'); const channel = calculateTrendChannel(fiveYearData.prices); if (channel) { const xMax = fiveYearData.prices.length - 1; const upperChannelValueAtEnd = channel.slope * xMax + channel.upperIntercept; if (currentPrice >= upperChannelValueAtEnd * 0.97) { const row = document.querySelector(`tr[data-ticker="${ticker}"]`); if (row) { const valuationCell = row.cells[4]; valuationCell.innerHTML = `<span class="traffic-light light-black" title="Price is within 3% of the 5-year upper channel boundary."></span>`; } } } }
     function handleChannelButtonClick() { if (!activeChartData) return; if (currentTrendChannel) { currentTrendChannel = null; } else { currentTrendChannel = calculateTrendChannel(activeChartData.prices); } channelButton.textContent = currentTrendChannel ? 'Remove Channel' : 'Draw Channel'; drawCharts(); }
     function destroyCharts() { if (priceChartInstance) priceChartInstance.destroy(); if (macdChartInstance) macdChartInstance.destroy(); priceChartInstance = macdChartInstance = null; }
-    function drawCharts() { destroyCharts(); const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = activeChartData; const annotationCfg = { draggable: true, onDragEnd: (e) => handleDragEnd(e, activeAnnotationData.ticker, activeAnnotationData.buyLevels), class: 'draggable' }; const createAnnotation = (id, y, label, color, bold) => ({ id, type: 'line', yMin: y, yMax: y, borderColor: color, borderWidth: bold ? 1.5 : 1, label: { content: label, display: true, position: 'end', backgroundColor: color, font: { size: 10 } }, ...annotationCfg }); const annotations = {}; if (activeAnnotationData.fairValue) { annotations.fairValue = { type: 'line', yMin: activeAnnotationData.fairValue, yMax: activeAnnotationData.fairValue, borderColor: 'gold', borderWidth: 2, borderDash: [6, 6], label: { content: 'FV', display: true, position: 'start', backgroundColor: 'rgba(255,215,0,0.7)' } }; } if (activeAnnotationData.buyLevels) { annotations.buy1 = createAnnotation('buy1', activeAnnotationData.buyLevels.level1, 'B1', 'rgba(72,199,142,0.7)'); annotations.buy2 = createAnnotation('buy2', activeAnnotationData.buyLevels.level2, 'B2', 'rgba(72,199,142,0.9)', true); annotations.buy3 = createAnnotation('buy3', activeAnnotationData.buyLevels.level3, 'B3', 'rgba(72,199,142,0.7)'); } if (currentTrendChannel) { const { slope, upperIntercept, lowerIntercept } = currentTrendChannel, xMax = prices.length - 1; annotations.channelUpper = { type: 'line', xMin: 0, yMin: upperIntercept, xMax, yMax: slope * xMax + upperIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; annotations.channelLower = { type: 'line', xMin: 0, yMin: lowerIntercept, xMax, yMax: slope * xMax + lowerIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; } priceChartInstance = new Chart(priceCanvas, { type: 'line', data: { labels: dates, datasets: [ { label: 'Price', data: prices, borderColor: '#a0a0a0', borderWidth: 2, pointRadius: 0 }, { label: 'EMA 10', data: ema10, borderColor: '#3e8ed0', borderWidth: 1, pointRadius: 0 }, { label: 'EMA 20', data: ema20, borderColor: '#48c78e', borderWidth: 1, pointRadius: 0 }, { label: 'SMA 50', data: sma50, borderColor: '#fadd78', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, { label: 'SMA 100', data: sma100, borderColor: '#f14668', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, annotation: { annotations } } } }); macdChartInstance = new Chart(macdCanvas, { type: 'bar', data: { labels: dates, datasets: [ { label: 'Histogram', data: histogram, backgroundColor: (ctx) => (ctx.raw>=0?'rgba(72,199,142,0.7)':'rgba(241,70,104,0.7)') }, { label: 'MACD', data: macdLine, type: 'line', borderColor: '#3e8ed0', borderWidth: 1.5, pointRadius: 0 }, { label: 'Signal', data: signalLine, type: 'line', borderColor: '#ffae42', borderWidth: 1.5, pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false } } } }); }
+    
+    function drawCharts() {
+        destroyCharts();
+        const { dates, prices, ema10, ema20, sma50, sma100, macdLine, signalLine, histogram } = activeChartData;
+        const annotationCfg = { draggable: true, onDragEnd: (e) => handleDragEnd(e, activeAnnotationData.ticker, activeAnnotationData.buyLevels), class: 'draggable' };
+        
+        // MODIFIED: This function creates the annotation with a formatted value instead of a static label.
+        const createAnnotation = (id, yValue, color, bold = false) => ({
+            id, type: 'line', yMin: yValue, yMax: yValue,
+            borderColor: color, borderWidth: bold ? 1.5 : 1,
+            label: {
+                content: `$${yValue.toFixed(2)}`, // Use formatted value for content
+                display: true, position: 'end', backgroundColor: color,
+                font: { size: 10 }
+            },
+            ...annotationCfg
+        });
+
+        const annotations = {};
+        if (activeAnnotationData.fairValue) { annotations.fairValue = { type: 'line', yMin: activeAnnotationData.fairValue, yMax: activeAnnotationData.fairValue, borderColor: 'gold', borderWidth: 2, borderDash: [6, 6], label: { content: 'FV', display: true, position: 'start', backgroundColor: 'rgba(255,215,0,0.7)' } }; }
+        if (activeAnnotationData.buyLevels) {
+            // MODIFIED: No longer passing "B1", "B2", etc.
+            annotations.buy1 = createAnnotation('buy1', activeAnnotationData.buyLevels.level1, 'rgba(72,199,142,0.7)');
+            annotations.buy2 = createAnnotation('buy2', activeAnnotationData.buyLevels.level2, 'rgba(72,199,142,0.9)', true);
+            annotations.buy3 = createAnnotation('buy3', activeAnnotationData.buyLevels.level3, 'rgba(72,199,142,0.7)');
+        }
+        if (currentTrendChannel) { const { slope, upperIntercept, lowerIntercept } = currentTrendChannel, xMax = prices.length - 1; annotations.channelUpper = { type: 'line', xMin: 0, yMin: upperIntercept, xMax, yMax: slope * xMax + upperIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; annotations.channelLower = { type: 'line', xMin: 0, yMin: lowerIntercept, xMax, yMax: slope * xMax + lowerIntercept, borderColor: 'rgba(62, 142, 208, 0.5)', borderWidth: 1, borderDash: [4, 4] }; }
+        
+        priceChartInstance = new Chart(priceCanvas, { type: 'line', data: { labels: dates, datasets: [ { label: 'Price', data: prices, borderColor: '#a0a0a0', borderWidth: 2, pointRadius: 0 }, { label: 'EMA 10', data: ema10, borderColor: '#3e8ed0', borderWidth: 1, pointRadius: 0 }, { label: 'EMA 20', data: ema20, borderColor: '#48c78e', borderWidth: 1, pointRadius: 0 }, { label: 'SMA 50', data: sma50, borderColor: '#fadd78', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, { label: 'SMA 100', data: sma100, borderColor: '#f14668', borderWidth: 1.5, borderDash: [2,2], pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, annotation: { annotations } } } });
+        macdChartInstance = new Chart(macdCanvas, { type: 'bar', data: { labels: dates, datasets: [ { label: 'Histogram', data: histogram, backgroundColor: (ctx) => (ctx.raw>=0?'rgba(72,199,142,0.7)':'rgba(241,70,104,0.7)') }, { label: 'MACD', data: macdLine, type: 'line', borderColor: '#3e8ed0', borderWidth: 1.5, pointRadius: 0 }, { label: 'Signal', data: signalLine, type: 'line', borderColor: '#ffae42', borderWidth: 1.5, pointRadius: 0 }, ] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { display: false } } } });
+    }
 
 </script>
 </body>
