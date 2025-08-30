@@ -99,7 +99,8 @@
         .map(id => document.getElementById(id) || document.querySelector(id));
 
     // --- State & Constants ---
-    const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+    // const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+    const CORS_PROXY = "https://corsproxy.io/?";
     let holdingsCount = 30, currentDiscountRate = 9.5, currentTerminalGrowthRate = 2.5, currentChartPeriod = '1y';
     let favoriteTickers = [], favoritesFilterActive = false, userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
     let currentTrendChannel = null, activeChartData = null, activeAnnotationData = null;
