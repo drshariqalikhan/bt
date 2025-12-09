@@ -1,7 +1,7 @@
 {
   "name": "QualityStock Screener",
   "short_name": "QualityStock",
-  "start_url": "./index.html",
+  "start_url": "./index_y.html",
   "display": "standalone",
   "background_color": "#1a1d21",
   "theme_color": "#363636",
@@ -20,4 +20,5 @@
       "purpose": "any maskable"
     }
   ]
+
 }
