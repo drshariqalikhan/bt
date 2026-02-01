@@ -100,7 +100,8 @@
 
     // --- State & Constants ---
     // const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-    const CORS_PROXY = "https://corsproxy.io/?";
+    //const CORS_PROXY = "https://corsproxy.io/?";
+    const CORS_PROXY = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url=", "https://thingproxy.freeboard.io/fetch/"][Math.floor(Math.random() * 3)];
     let holdingsCount = 30, currentDiscountRate = 9.5, currentTerminalGrowthRate = 2.5, currentChartPeriod = '1y';
     let favoriteTickers = [], favoritesFilterActive = false, userModifiedBuyLevels = {}, priceChartInstance = null, macdChartInstance = null;
     let currentTrendChannel = null, activeChartData = null, activeAnnotationData = null;
